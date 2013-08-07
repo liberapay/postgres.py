@@ -206,7 +206,8 @@ class Postgres(object):
                 yield row
 
     def get_cursor(self, *a, **kw):
-        """Return a :py:class:`~postgres.CursorContextManager` that uses our connection pool.
+        """Return a :py:class:`~postgres.CursorContextManager` that uses our
+        connection pool.
 
         This is what :py:meth:`~postgres.Postgres.execute`,
         :py:meth:`~postgres.Postgres.fetchone`, and
@@ -219,7 +220,8 @@ class Postgres(object):
         return CursorContextManager(self.pool, *a, **kw)
 
     def get_transaction(self, *a, **kw):
-        """Return a :py:class:`~postgres.TransactionContextManager` that uses our connection pool.
+        """Return a :py:class:`~postgres.TransactionContextManager` that uses
+        our connection pool.
 
         Use this when you want a series of statements to be part of one
         transaction, but you don't need fine-grained control over the
@@ -229,7 +231,8 @@ class Postgres(object):
         return TransactionContextManager(self.pool, *a, **kw)
 
     def get_connection(self):
-        """Return a :py:class:`~postgres.ConnectionContextManager` that uses our connection pool.
+        """Return a :py:class:`~postgres.ConnectionContextManager` that uses
+        our connection pool.
 
         Use this when you want to take advantage of connection pooling, but
         otherwise need full control, for example, to do complex things with
@@ -296,7 +299,8 @@ class CursorContextManager(object):
 
 
 class TransactionContextManager(object):
-    """Instantiated once per :py:func:`~postgres.Postgres.get_transaction` call.
+    """Instantiated once per :py:func:`~postgres.Postgres.get_transaction`
+    call.
 
     The return value of :py:func:`TransactionContextManager.__enter__` is a
     :py:class:`psycopg2.extras.RealDictCursor`. Any positional and keyword
