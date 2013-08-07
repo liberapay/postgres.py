@@ -67,6 +67,18 @@ class TestCursor(WithData):
             actual = cursor.fetchall()
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
 
+    def test_we_can_use_cursor_rowcount(self):
+        with self.db.get_cursor() as cursor:
+            cursor.execute("SELECT * FROM foo ORDER BY bar")
+            actual = cursor.rowcount
+        assert actual == 2
+
+    def test_we_can_use_cursor_closed(self):
+        with self.db.get_cursor() as cursor:
+            cursor.execute("SELECT * FROM foo ORDER BY bar")
+            actual = cursor.closed
+        assert not actual
+
 
 class TestTransaction(WithData):
 
