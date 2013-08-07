@@ -153,7 +153,6 @@ class Postgres(object):
 
     Features:
 
-      - Calls are isolated in transactions.
       - Get back unicode instead of bytestrings.
 
 
