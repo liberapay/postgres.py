@@ -12,7 +12,7 @@ Features:
 Installation
 ------------
 
-:py:mod:`postgres` is available on `PyPI`_ and `GitHub`_.
+:py:mod:`postgres` is available on `GitHub`_ and `PyPI`_::
 
     $ pip install postgres
 
