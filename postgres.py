@@ -4,7 +4,7 @@
 Installation
 ------------
 
-:py:mod:`postgres` is available on `GitHub`_ and `PyPI`_::
+:py:mod:`postgres` is available on `GitHub`_ and on `PyPI`_::
 
     $ pip install postgres
 
@@ -15,25 +15,43 @@ Tutorial
 Instantiate a :py:class:`Postgres` object when your application starts:
 
     >>> from postgres import Postgres
-    >>> db = Postgres("postgres://jdoe@localhost/testdb")
+    >>> db = Postgres("postgres://jrandom@localhost/testdb")
 
-Use it to run SQL statements:
+Use :py:meth:`~postgres.Postgres.run` to run SQL statements:
 
-    >>> db.execute("CREATE TABLE foo (bar text)")
-    >>> db.execute("INSERT INTO foo VALUES ('baz')")
-    >>> db.execute("INSERT INTO foo VALUES ('buz')")
+    >>> db.run("CREATE TABLE foo (bar text)")
+    >>> db.run("INSERT INTO foo VALUES ('baz')")
+    >>> db.run("INSERT INTO foo VALUES ('buz')")
 
-Use it to fetch all results:
+Use :py:meth:`~postgres.Postgres.one` to fetch one result:
 
-    >>> db.fetchall("SELECT * FROM foo ORDER BY bar")
-    [{"bar": "baz"}, {"bar": "buz"}]
-
-Use it to fetch one result:
-
-    >>> db.fetchone("SELECT * FROM foo ORDER BY bar")
-    {"bar": "baz"}
-    >>> db.fetchone("SELECT * FROM foo WHERE bar='blam'")
+    >>> db.one("SELECT * FROM foo ORDER BY bar")
+    {'bar': 'baz'}
+    >>> db.one("SELECT * FROM foo WHERE bar='blam'")
     None
+
+Use :py:meth:`~postgres.Postgres.rows` to fetch all results:
+
+    >>> db.rows("SELECT * FROM foo ORDER BY bar")
+    [{'bar': 'baz'}, {'bar': 'buz'}]
+
+
+Bind Parameters
++++++++++++++++
+
+In case you're not familiar with bind parameters in DB-API 2.0, the basic idea
+is that you put ``%(foo)s`` in your SQL strings, and then pass in a second
+argument, a :py:class:`dict`, containing parameters that :py:mod:`psycopg2` (as
+an implementation of DB-API 2.0) will bind to the query in a way that is safe
+against SQL injection. (This is inspired by old-style Python string formatting,
+but it is not the same.)
+
+    >>> db.one("SELECT * FROM foo WHERE bar=%(bar)s", {"bar": "baz"})
+    {'bar': 'baz'}
+
+Never build SQL strings out of user input!
+
+Always pass user input as bind parameters!
 
 
 Context Managers
@@ -53,7 +71,8 @@ connection pooling:
     >>> with db.get_cursor() as cursor:
     ...     cursor.execute("SELECT * FROM foo ORDER BY bar")
     ...     cursor.fetchall()
-    [{"bar": "baz"}, {"bar": "buz"}]
+    ...
+    [{'bar': 'baz'}, {'bar': 'buz'}]
 
 A cursor you get from :py:func:`~postgres.Postgres.get_cursor` has
 :py:attr:`autocommit` turned on for its connection, so every call you make
@@ -65,13 +84,19 @@ multiple calls in a single transaction? Use the
     ...     txn.execute("INSERT INTO foo VALUES ('blam')")
     ...     txn.execute("SELECT * FROM foo ORDER BY bar")
     ...     txn.fetchall()
-    [{"bar": "baz"}, {"bar": "blam"}, {"bar": "buz"}]
     ...
-    ...     db.fetchall("SELECT * FROM foo ORDER BY bar")
-    [{"bar": "baz"}, {"bar": "buz"}]
+    [{'bar': 'baz'}, {'bar': 'blam'}, {'bar': 'buz'}]
+
+Note that other calls won't see the changes on your transaction until the end
+of your code block, when the context manager commits the transaction::
+
+    >>> with db.get_transaction() as txn:
+    ...     txn.execute("INSERT INTO foo VALUES ('blam')")
+    ...     db.rows("SELECT * FROM foo ORDER BY bar")
     ...
-    ... db.fetchall("SELECT * FROM foo ORDER BY bar")
-    [{"bar": "baz"}, {"bar": "blam"}, {"bar": "buz"}]
+    [{'bar': 'baz'}, {'bar': 'buz'}]
+    >>> db.rows("SELECT * FROM foo ORDER BY bar")
+    [{'bar': 'baz'}, {'bar': 'blam'}, {'bar': 'buz'}]
 
 The :py:func:`~postgres.Postgres.get_transaction` manager gives you a cursor
 with :py:attr:`autocommit` turned off on its connection. If the block under
@@ -85,7 +110,8 @@ straight from the connection pool:
     ...     cursor = connection.cursor()
     ...     cursor.execute("SELECT * FROM foo ORDER BY bar")
     ...     cursor.fetchall()
-    [{"bar": "baz"}, {"bar": "buz"}]
+    ...
+    [{'bar': 'baz'}, {'bar': 'buz'}]
 
 A connection gotten in this way will have :py:attr:`autocommit` turned off, and
 it'll never be implicitly committed otherwise. It'll actually be rolled back
@@ -155,18 +181,35 @@ class Postgres(object):
     :param int maxconn: The minimum size of the connection pool
 
     This is the main object that :py:mod:`postgres` provides, and you should
-    have one instance per process for each database your process needs to talk
-    to. When instantiated, this object creates a `thread-safe connection pool
+    have one instance per process for each PostgreSQL database your process
+    wants to talk to using this library. When instantiated, this object creates
+    a `thread-safe connection pool
     <http://initd.org/psycopg/docs/pool.html#psycopg2.pool.ThreadedConnectionPool>`_,
     which opens :py:attr:`minconn` connections immediately, and up to
     :py:attr:`maxconn` according to demand. The fundamental value of a
     :py:class:`~postgres.Postgres` instance is that it runs everything through
     its connection pool.
 
+    The names in our simple API, :py:meth:`~postgres.Postgres.run`,
+    :py:meth:`~postgres.Postgres.one`, and :py:meth:`~postgres.Postgres.rows`,
+    were chosen to be short and memorable, and to not conflict with the DB-API
+    2.0 :py:meth:`execute`, :py:meth:`fetchone`, and :py:meth:`fetchall`
+    methods, which have slightly different semantics (under DB-API 2.0 you call
+    :py:meth:`execute` on a cursor and then call one of the :py:meth:`fetch*`
+    methods on the same cursor to retrieve rows; with our simple API there is
+    no second :py:meth:`fetch` step). The context managers on this class are
+    named starting with :py:meth:`get_` to set them apart from the simple-case
+    API.  Note that when working inside a block under one of the context
+    managers, you're using DB-API 2.0 (:py:meth:`execute` + :py:meth:`fetch*`),
+    not our simple API (:py:meth:`~postgres.Postgres.run` /
+    :py:meth:`~postgres.Postgres.one` / :py:meth:`~postgres.Postgres.rows`).
+
     Features:
 
       - Get back unicode instead of bytestrings.
 
+    >>> import postgres
+    >>> db = postgres.Postgres("postgres://jrandom@localhost/test")
 
     """
 
@@ -179,38 +222,52 @@ class Postgres(object):
                                   , connection_factory=Connection
                                    )
 
-    def execute(self, sql, parameters=None):
-        """Execute the query and discard any results.
+    def run(self, sql, parameters=None):
+        """Execute a query and discard any results.
 
         :param unicode sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
-        :type parameters: tuple or dict
+        :type parameters: dict or tuple
         :returns: :py:const:`None`
+
+        >>> db.run("CREATE TABLE foo (bar text)")
+        >>> db.run("INSERT INTO foo VALUES ('baz')")
+        >>> db.run("INSERT INTO foo VALUES ('buz')")
 
         """
         with self.get_cursor() as cursor:
             cursor.execute(sql, parameters)
 
-    def fetchone(self, sql, parameters=None):
-        """Execute the query and return a single result.
+    def one(self, sql, parameters=None):
+        """Execute a query and return a single result.
 
         :param unicode sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
-        :type parameters: tuple or dict
+        :type parameters: dict or tuple
         :returns: :py:class:`dict` or :py:const:`None`
+
+        >>> row = db.one("SELECT * FROM foo WHERE bar='baz'"):
+        >>> print(row["bar"])
+        baz
 
         """
         with self.get_cursor() as cursor:
             cursor.execute(sql, parameters)
             return cursor.fetchone()
 
-    def fetchall(self, sql, parameters=None):
-        """Execute the query and return all results.
+    def rows(self, sql, parameters=None):
+        """Execute a query and return all resulting rows.
 
         :param unicode sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
-        :type parameters: tuple or dict
+        :type parameters: dict or tuple
         :returns: :py:class:`list` of :py:class:`dict`
+
+        >>> for row in db.rows("SELECT bar FROM foo"):
+        ...     print(row["bar"])
+        ...
+        baz
+        buz
 
         """
         with self.get_cursor() as cursor:
@@ -223,10 +280,15 @@ class Postgres(object):
 
         This is what :py:meth:`~postgres.Postgres.execute`,
         :py:meth:`~postgres.Postgres.fetchone`, and
-        :py:meth:`~postgres.Postgres.fetchall` use under the hood. It's
-        probably less directly useful than
-        :py:meth:`~postgres.Postgres.get_transaction` and
-        :py:meth:`~postgres.Postgres.get_connection`.
+        :py:meth:`~postgres.Postgres.fetchall` use under the hood. You might
+        use it if you want to access `cursor attributes
+        <http://initd.org/psycopg/docs/cursor.html>`_, for example.
+
+        >>> with db.get_cursor() as cursor:
+        ...     cursor.execute("SELECT * FROM foo")
+        ...     cursor.rowcount
+        ...
+        2
 
         """
         return CursorContextManager(self.pool, *a, **kw)
@@ -237,7 +299,15 @@ class Postgres(object):
 
         Use this when you want a series of statements to be part of one
         transaction, but you don't need fine-grained control over the
-        transaction.
+        transaction. If your code block inside the :py:obj:`with` statement
+        raises an exception, the transaction will be rolled back. Otherwise,
+        it'll be committed.
+
+        >>> with db.get_transaction() as txn:
+        ...     txn.execute("SELECT * FROM foo")
+        ...     txn.fetchall()
+        ...
+        [{'bar': 'baz'}, {'bar': 'buz'}]
 
         """
         return TransactionContextManager(self.pool, *a, **kw)
@@ -250,6 +320,13 @@ class Postgres(object):
         otherwise need full control, for example, to do complex things with
         transactions.
 
+        >>> with db.get_connection() as connection:
+        ...     cursor = connection.cursor()
+        ...     cursor.execute("SELECT * FROM foo")
+        ...     cursor.fetchall()
+        ...
+        [{'bar': 'baz'}, {'bar': 'buz'}]
+
         """
         return ConnectionContextManager(self.pool)
 
@@ -257,8 +334,8 @@ class Postgres(object):
 class Connection(psycopg2.extensions.connection):
     """This is a subclass of :py:class:`psycopg2.extensions.connection`.
 
-    This class is used as the :py:attr:`connection_factory` for the connection
-    pool in :py:class:`Postgres`. Here are the differences from the base class:
+    :py:class:`Postgres` uses this class as the :py:attr:`connection_factory`
+    for its connection pool. Here are the differences from the base class:
 
         - We set :py:attr:`autocommit` to :py:const:`True`.
         - We set the client encoding to ``UTF-8``.

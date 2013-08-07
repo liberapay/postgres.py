@@ -13,50 +13,59 @@ class WithSchema(TestCase):
 
     def setUp(self):
         self.db = Postgres(DATABASE_URL)
-        self.db.execute("DROP SCHEMA IF EXISTS public CASCADE")
-        self.db.execute("CREATE SCHEMA public")
+        self.db.run("DROP SCHEMA IF EXISTS public CASCADE")
+        self.db.run("CREATE SCHEMA public")
 
     def tearDown(self):
-        self.db.execute("DROP SCHEMA IF EXISTS public CASCADE")
+        self.db.run("DROP SCHEMA IF EXISTS public CASCADE")
 
 
 class WithData(WithSchema):
 
     def setUp(self):
         WithSchema.setUp(self)
-        self.db.execute("CREATE TABLE foo (bar text)")
-        self.db.execute("INSERT INTO foo VALUES ('baz')")
-        self.db.execute("INSERT INTO foo VALUES ('buz')")
+        self.db.run("CREATE TABLE foo (bar text)")
+        self.db.run("INSERT INTO foo VALUES ('baz')")
+        self.db.run("INSERT INTO foo VALUES ('buz')")
 
 
-class TestExecute(WithSchema):
+class TestRun(WithSchema):
 
-    def test_execute_executes(self):
-        self.db.execute("CREATE TABLE foo (bar text)")
-        actual = self.db.fetchall("SELECT tablename FROM pg_tables "
-                                  "WHERE schemaname='public'")
+    def test_run_runs(self):
+        self.db.run("CREATE TABLE foo (bar text)")
+        actual = self.db.rows("SELECT tablename FROM pg_tables "
+                              "WHERE schemaname='public'")
         assert actual == [{"tablename": "foo"}]
 
-    def test_execute_inserts(self):
-        self.db.execute("CREATE TABLE foo (bar text)")
-        self.db.execute("INSERT INTO foo VALUES ('baz')")
-        actual = len(self.db.fetchone("SELECT * FROM foo ORDER BY bar"))
+    def test_run_inserts(self):
+        self.db.run("CREATE TABLE foo (bar text)")
+        self.db.run("INSERT INTO foo VALUES ('baz')")
+        actual = len(self.db.one("SELECT * FROM foo ORDER BY bar"))
         assert actual == 1
 
 
-class TestFetch(WithData):
+class TestOneAndRows(WithData):
 
-    def test_fetchone_fetches_the_first_one(self):
-        actual = self.db.fetchone("SELECT * FROM foo ORDER BY bar")
+    def test_one_fetches_the_first_one(self):
+        actual = self.db.one("SELECT * FROM foo ORDER BY bar")
         assert actual == {"bar": "baz"}
 
-    def test_fetchone_returns_None_if_theres_none(self):
-        actual = self.db.fetchone("SELECT * FROM foo WHERE bar='blam'")
+    def test_one_returns_None_if_theres_none(self):
+        actual = self.db.one("SELECT * FROM foo WHERE bar='blam'")
         assert actual is None
 
-    def test_fetchall_fetches_all(self):
-        actual = self.db.fetchall("SELECT * FROM foo ORDER BY bar")
+    def test_rows_fetches_all_rows(self):
+        actual = self.db.rows("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
+
+    def test_bind_parameters_as_dict_work(self):
+        params = {"bar": "baz"}
+        actual = self.db.rows("SELECT * FROM foo WHERE bar=%(bar)s", params)
+        assert actual == [{"bar": "baz"}]
+
+    def test_bind_parameters_as_tuple_work(self):
+        actual = self.db.rows("SELECT * FROM foo WHERE bar=%s", ("baz",))
+        assert actual == [{"bar": "baz"}]
 
 
 class TestCursor(WithData):
@@ -93,14 +102,14 @@ class TestTransaction(WithData):
         with self.db.get_transaction() as txn:
             txn.execute("INSERT INTO foo VALUES ('blam')")
             txn.execute("SELECT * FROM foo ORDER BY bar")
-            actual = self.db.fetchall("SELECT * FROM foo ORDER BY bar")
+            actual = self.db.rows("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
 
     def test_transaction_commits_on_success(self):
         with self.db.get_transaction() as txn:
             txn.execute("INSERT INTO foo VALUES ('blam')")
             txn.execute("SELECT * FROM foo ORDER BY bar")
-        actual = self.db.fetchall("SELECT * FROM foo ORDER BY bar")
+        actual = self.db.rows("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "blam"}, {"bar": "buz"}]
 
     def test_transaction_rolls_back_on_failure(self):
@@ -112,7 +121,7 @@ class TestTransaction(WithData):
                 raise Heck
         except Heck:
             pass
-        actual = self.db.fetchall("SELECT * FROM foo ORDER BY bar")
+        actual = self.db.rows("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
 
 
