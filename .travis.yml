@@ -8,8 +8,7 @@ python:
   - 3.3
   - 3.4
 install:
-  - python setup.py -q install
-  - pip install --use-mirrors pytest
+  - pip install --use-mirrors pytest ./
 before_script:
   - psql -U postgres -c 'CREATE DATABASE "test";'
 script: DATABASE_URL=postgres://postgres@localhost/test py.test tests.py -v
