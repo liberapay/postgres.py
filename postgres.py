@@ -185,25 +185,37 @@ class Postgres(object):
         :param unicode sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
         :type parameters: tuple or dict
+        :returns: :py:const:`None`
 
         """
         with self.get_cursor() as cursor:
             cursor.execute(sql, parameters)
 
     def fetchone(self, sql, parameters=None):
-        """Execute the query and return a single result (``dict`` or ``None``).
+        """Execute the query and return a single result.
+
+        :param unicode sql: the SQL statement to execute
+        :param parameters: the bind parameters for the SQL statement
+        :type parameters: tuple or dict
+        :returns: :py:class:`dict` or :py:const:`None`
+
         """
         with self.get_cursor() as cursor:
             cursor.execute(sql, parameters)
             return cursor.fetchone()
 
     def fetchall(self, sql, parameters=None):
-        """Execute the query and yield the results (``dict``).
+        """Execute the query and return all results.
+
+        :param unicode sql: the SQL statement to execute
+        :param parameters: the bind parameters for the SQL statement
+        :type parameters: tuple or dict
+        :returns: :py:class:`list` of :py:class:`dict`
+
         """
         with self.get_cursor() as cursor:
             cursor.execute(sql, parameters)
-            for row in cursor:
-                yield row
+            return list(cursor)
 
     def get_cursor(self, *a, **kw):
         """Return a :py:class:`~postgres.CursorContextManager` that uses our

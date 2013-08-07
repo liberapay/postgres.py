@@ -33,14 +33,14 @@ class TestExecute(WithSchema):
 
     def test_execute_executes(self):
         self.db.execute("CREATE TABLE foo (bar text)")
-        actual = list(self.db.fetchall("SELECT tablename FROM pg_tables "
-                                       "WHERE schemaname='public'"))
+        actual = self.db.fetchall("SELECT tablename FROM pg_tables "
+                                  "WHERE schemaname='public'")
         assert actual == [{"tablename": "foo"}]
 
     def test_execute_inserts(self):
         self.db.execute("CREATE TABLE foo (bar text)")
         self.db.execute("INSERT INTO foo VALUES ('baz')")
-        actual = len(list(self.db.fetchone("SELECT * FROM foo ORDER BY bar")))
+        actual = len(self.db.fetchone("SELECT * FROM foo ORDER BY bar"))
         assert actual == 1
 
 
@@ -55,7 +55,7 @@ class TestFetch(WithData):
         assert actual is None
 
     def test_fetchall_fetches_all(self):
-        actual = list(self.db.fetchall("SELECT * FROM foo ORDER BY bar"))
+        actual = self.db.fetchall("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
 
 
@@ -81,14 +81,14 @@ class TestTransaction(WithData):
         with self.db.get_transaction() as txn:
             txn.execute("INSERT INTO foo VALUES ('blam')")
             txn.execute("SELECT * FROM foo ORDER BY bar")
-            actual = list(self.db.fetchall("SELECT * FROM foo ORDER BY bar"))
+            actual = self.db.fetchall("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
 
     def test_transaction_commits_on_success(self):
         with self.db.get_transaction() as txn:
             txn.execute("INSERT INTO foo VALUES ('blam')")
             txn.execute("SELECT * FROM foo ORDER BY bar")
-        actual = list(self.db.fetchall("SELECT * FROM foo ORDER BY bar"))
+        actual = self.db.fetchall("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "blam"}, {"bar": "buz"}]
 
     def test_transaction_rolls_back_on_failure(self):
@@ -100,7 +100,7 @@ class TestTransaction(WithData):
                 raise Heck
         except Heck:
             pass
-        actual = list(self.db.fetchall("SELECT * FROM foo ORDER BY bar"))
+        actual = self.db.fetchall("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
 
 
