@@ -116,6 +116,9 @@ from psycopg2.extras import RealDictCursor
 from psycopg2.pool import ThreadedConnectionPool as ConnectionPool
 
 
+# A Helper
+# ========
+
 # Teach urlparse about postgres:// URLs.
 if 'postgres' not in urlparse.uses_netloc:
     urlparse.uses_netloc.append('postgres')
@@ -136,6 +139,9 @@ def url_to_dsn(url):
     dsn %= (dbname, user, password, host, port)
     return dsn
 
+
+# The Main Event
+# ==============
 
 class Postgres(object):
     """Interact with a `PostgreSQL <http://www.postgresql.org/>`_ datastore.
@@ -164,7 +170,7 @@ class Postgres(object):
         self.pool = ConnectionPool( minconn=minconn
                                   , maxconn=maxconn
                                   , dsn=dsn
-                                  , connection_factory=PostgresConnection
+                                  , connection_factory=Connection
                                    )
 
     def execute(self, *a, **kw):
@@ -194,7 +200,7 @@ class Postgres(object):
         upon both successful and exceptional executions against the cursor.
 
         """
-        return PostgresCursorContextManager(self.pool, *a, **kw)
+        return CursorContextManager(self.pool, *a, **kw)
 
     def get_transaction(self, *a, **kw):
         """Return a context manager wrapping a transactional cursor.
@@ -206,10 +212,10 @@ class Postgres(object):
         fine-grained  control over the transaction.
 
         """
-        return PostgresTransactionContextManager(self.pool, *a, **kw)
+        return TransactionContextManager(self.pool, *a, **kw)
 
     def get_connection(self):
-        """Return a context manager wrapping a PostgresConnection.
+        """Return a context manager wrapping a :py:class:`postgres.Connection`.
 
         This manager turns autocommit off, and back on when you're done with
         the connection. The connection is rolled back on exit, so be sure to
@@ -217,10 +223,10 @@ class Postgres(object):
         full fine-grained transaction control.
 
         """
-        return PostgresConnectionContextManager(self.pool)
+        return ConnectionContextManager(self.pool)
 
 
-class PostgresConnection(psycopg2.extensions.connection):
+class Connection(psycopg2.extensions.connection):
     """This is a subclass of psycopg2.extensions.connection.
 
     Changes:
@@ -246,56 +252,10 @@ class PostgresConnection(psycopg2.extensions.connection):
         return psycopg2.extensions.connection.cursor(self, *a, **kw)
 
 
-class PostgresTransactionContextManager(object):
-    """Instantiated once per db.get_transaction call.
-    """
+# Context Managers
+# ================
 
-    def __init__(self, pool, *a, **kw):
-        self.pool = pool
-        self.conn = None
-
-    def __enter__(self, *a, **kw):
-        """Get a connection from the pool.
-        """
-        self.conn = self.pool.getconn()
-        self.conn.autocommit = False
-        return self.conn.cursor(*a, **kw)
-
-    def __exit__(self, *exc_info):
-        """Put our connection back in the pool.
-        """
-        if exc_info == (None, None, None):
-            self.conn.commit()
-        else:
-            self.conn.rollback()
-        self.conn.autocommit = True
-        self.pool.putconn(self.conn)
-
-
-class PostgresConnectionContextManager(object):
-    """Instantiated once per db.get_connection call.
-    """
-
-    def __init__(self, pool, *a, **kw):
-        self.pool = pool
-        self.conn = None
-
-    def __enter__(self):
-        """Get a connection from the pool.
-        """
-        self.conn = self.pool.getconn()
-        self.conn.autocommit = False
-        return self.conn
-
-    def __exit__(self, *exc_info):
-        """Put our connection back in the pool.
-        """
-        self.conn.rollback()
-        self.conn.autocommit = True
-        self.pool.putconn(self.conn)
-
-
-class PostgresCursorContextManager(object):
+class CursorContextManager(object):
     """Instantiated once per cursor-level db access.
     """
 
@@ -323,4 +283,53 @@ class PostgresCursorContextManager(object):
     def __exit__(self, *exc_info):
         """Put our connection back in the pool.
         """
+        self.pool.putconn(self.conn)
+
+
+class TransactionContextManager(object):
+    """Instantiated once per db.get_transaction call.
+    """
+
+    def __init__(self, pool, *a, **kw):
+        self.pool = pool
+        self.conn = None
+
+    def __enter__(self, *a, **kw):
+        """Get a connection from the pool.
+        """
+        self.conn = self.pool.getconn()
+        self.conn.autocommit = False
+        return self.conn.cursor(*a, **kw)
+
+    def __exit__(self, *exc_info):
+        """Put our connection back in the pool.
+        """
+        if exc_info == (None, None, None):
+            self.conn.commit()
+        else:
+            self.conn.rollback()
+        self.conn.autocommit = True
+        self.pool.putconn(self.conn)
+
+
+class ConnectionContextManager(object):
+    """Instantiated once per db.get_connection call.
+    """
+
+    def __init__(self, pool, *a, **kw):
+        self.pool = pool
+        self.conn = None
+
+    def __enter__(self):
+        """Get a connection from the pool.
+        """
+        self.conn = self.pool.getconn()
+        self.conn.autocommit = False
+        return self.conn
+
+    def __exit__(self, *exc_info):
+        """Put our connection back in the pool.
+        """
+        self.conn.rollback()
+        self.conn.autocommit = True
         self.pool.putconn(self.conn)
