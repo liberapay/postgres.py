@@ -91,17 +91,13 @@ def url_to_dsn(url):
 class Postgres(object):
     """Interact with a `PostgreSQL <http://www.postgresql.org/>`_ datastore.
 
+    :param unicode url: A ``postgres://`` URL or a `PostgreSQL connection string <http://www.postgresql.org/docs/current/static/libpq-connect.html>`_
+    :param int minconn: The minimum size of the connection pool
+    :param int maxconn: The minimum size of the connection pool
+
     This is the main object that :py:mod:`postgres` provides, and you should
-    have one instance per process. Here are the arguments:
-
-     - ``url`` - A ``postgres://`` URL or a `PostgreSQL connection string
-       <http://www.postgresql.org/docs/current/static/libpq-connect.html>`_
-
-     - ``minconn`` - The minimum size of the connection pool
-
-     - ``maxconn`` - The maximum size of the connection pool
-
-    When instantiated, this object creates a `thread-safe connection pool
+    have one instance per process. When instantiated, this object creates a
+    `thread-safe connection pool
     <http://initd.org/psycopg/docs/pool.html#psycopg2.pool.ThreadedConnectionPool>`_,
     which opens ``minconn`` connections immediately and up to ``maxconn``
     according to demand.
