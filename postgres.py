@@ -1,13 +1,5 @@
 """:py:mod:`postgres` is a high-value abstraction over `psycopg2`_.
 
-Features:
-
-  - Use URLs instead of just connection strings.
-  - Connections are pooled.
-  - Calls are isolated in transactions.
-  - Cursors yield dictionaries.
-  - Text is unicode instead of bytestrings.
-
 
 Installation
 ------------
@@ -20,12 +12,12 @@ Installation
 Tutorial
 --------
 
-Instantiate a :py:class:`Postgres` object when your application starts::
+Instantiate a :py:class:`Postgres` object when your application starts:
 
     >>> from postgres import Postgres
     >>> db = Postgres("postgres://jdoe@localhost/testdb")
 
-Use it to run SQL statements::
+Use it to run SQL statements:
 
     >>> db.execute("CREATE TABLE foo (bar text)")
     >>> db.execute("INSERT INTO foo VALUES ('baz')")
@@ -42,6 +34,11 @@ Use it to fetch one result:
     {"bar": "baz"}
     >>> db.fetchone("SELECT * FROM foo WHERE bar='blam'")
     None
+
+Work with a cursor directly:
+
+    >>> with db.get_cursor('SELECT * FROM foo ORDER BY bar') as cursor:
+    ...     results = cursor.fetchall()
 
 
 API
@@ -92,20 +89,28 @@ def url_to_dsn(url):
 
 
 class Postgres(object):
-    """Interact with a PostgreSQL datastore.
+    """Interact with a `PostgreSQL <http://www.postgresql.org/>`_ datastore.
 
     This is the main object that :py:mod:`postgres` provides, and you should
     have one instance per process. Here are the arguments:
 
-     - url - A "postgres://" url or a `PostgreSQL connection string
+     - ``url`` - A ``postgres://`` URL or a `PostgreSQL connection string
        <http://www.postgresql.org/docs/current/static/libpq-connect.html>`_
 
-     - minconn - The minimum size of the connection pool
+     - ``minconn`` - The minimum size of the connection pool
 
-     - maxconn - The maximum size of the connection pool
+     - ``maxconn`` - The maximum size of the connection pool
 
-    The connection pool is a `psycopg2.pool.ThreadedConnectionPool
-    <http://initd.org/psycopg/docs/pool.html#psycopg2.pool.ThreadedConnectionPool>`_.
+    When instantiated, this object creates a `thread-safe connection pool
+    <http://initd.org/psycopg/docs/pool.html#psycopg2.pool.ThreadedConnectionPool>`_,
+    which opens ``minconn`` connections immediately and up to ``maxconn``
+    according to demand.
+
+    Features:
+
+      - Calls are isolated in transactions.
+      - Get back unicode instead of bytestrings.
+
 
     """
 
@@ -119,19 +124,19 @@ class Postgres(object):
                                    )
 
     def execute(self, *a, **kw):
-        """Execute the query and discard the results.
+        """Execute the query and discard any results.
         """
         with self.get_cursor(*a, **kw):
             pass
 
     def fetchone(self, *a, **kw):
-        """Execute the query and return a single result or None.
+        """Execute the query and return a single result (``dict`` or ``None``).
         """
         with self.get_cursor(*a, **kw) as cursor:
             return cursor.fetchone()
 
     def fetchall(self, *a, **kw):
-        """Execute the query and yield the results.
+        """Execute the query and yield the results (``dict``).
         """
         with self.get_cursor(*a, **kw) as cursor:
             for row in cursor:
