@@ -50,13 +50,15 @@ Here's how to work directly with a `psycogpg2 cursor
 <http://initd.org/psycopg/docs/cursor.html>`_ while still taking advantage of
 connection pooling:
 
-    >>> with db.get_cursor('SELECT * FROM foo ORDER BY bar') as cursor:
-    ...     results = cursor.fetchall()
+    >>> with db.get_cursor() as cursor:
+    ...     cursor.execute("SELECT * FROM foo ORDER BY bar")
+    ...     cursor.fetchall()
+    [{"bar": "baz"}, {"bar": "buz"}]
 
 A cursor you get from :py:func:`~postgres.Postgres.get_cursor` has
-``autocommit`` turned on for its connection, so every call you make using such
-a cursor will be isolated in a separate transaction. Need to include multiple
-calls in a single transaction? Use the
+:py:attr:`autocommit` turned on for its connection, so every call you make
+using such a cursor will be isolated in a separate transaction. Need to include
+multiple calls in a single transaction? Use the
 :py:func:`~postgres.Postgres.get_transaction` context manager:
 
     >>> with db.get_transaction() as txn:
@@ -72,22 +74,22 @@ calls in a single transaction? Use the
     [{"bar": "baz"}, {"bar": "blam"}, {"bar": "buz"}]
 
 The :py:func:`~postgres.Postgres.get_transaction` manager gives you a cursor
-with ``autocommit`` turned off on its connection. If the block under management
-raises, the connection is rolled back. Otherwise it's committed.  Use this when
-you want a series of statements to be part of one transaction, but you don't
-need fine-grained control over the transaction. For fine-grained control, use
-:py:func:`~postgres.Postgres.get_connection` to get a connection straight from
-the connection pool:
+with :py:attr:`autocommit` turned off on its connection. If the block under
+management raises, the connection is rolled back. Otherwise it's committed.
+Use this when you want a series of statements to be part of one transaction,
+but you don't need fine-grained control over the transaction. For fine-grained
+control, use :py:func:`~postgres.Postgres.get_connection` to get a connection
+straight from the connection pool:
 
     >>> with db.get_connection() as connection:
     ...     cursor = connection.cursor()
-    ...     cursor.execute('SELECT * FROM foo ORDER BY bar')
+    ...     cursor.execute("SELECT * FROM foo ORDER BY bar")
     ...     cursor.fetchall()
     [{"bar": "baz"}, {"bar": "buz"}]
 
-A connection gotten in this way will have ``autocommit`` turned off, and it'll
-never be implicitly committed otherwise. It'll actually be rolled back when
-you're done with it, so it's up to you to explicitly commit as needed.
+A connection gotten in this way will have :py:attr:`autocommit` turned off, and
+it'll never be implicitly committed otherwise. It'll actually be rolled back
+when you're done with it, so it's up to you to explicitly commit as needed.
 
 
 API
@@ -122,15 +124,13 @@ from psycopg2.pool import ThreadedConnectionPool as ConnectionPool
 
 # A Helper
 # ========
+# Heroku gives us an URL, psycopg2 wants a DSN. Convert!
 
-# Teach urlparse about postgres:// URLs.
 if 'postgres' not in urlparse.uses_netloc:
+    # Teach urlparse about postgres:// URLs.
     urlparse.uses_netloc.append('postgres')
 
-
 def url_to_dsn(url):
-    """Heroku gives us an URL, psycopg2 wants a DSN. Convert!
-    """
     parsed = urlparse.urlparse(url)
     dbname = parsed.path[1:] # /foobar
     user = parsed.username
@@ -148,18 +148,20 @@ def url_to_dsn(url):
 # ==============
 
 class Postgres(object):
-    """Interact with a `PostgreSQL <http://www.postgresql.org/>`_ datastore.
+    """Interact with a `PostgreSQL <http://www.postgresql.org/>`_ database.
 
     :param unicode url: A ``postgres://`` URL or a `PostgreSQL connection string <http://www.postgresql.org/docs/current/static/libpq-connect.html>`_
     :param int minconn: The minimum size of the connection pool
     :param int maxconn: The minimum size of the connection pool
 
     This is the main object that :py:mod:`postgres` provides, and you should
-    have one instance per process. When instantiated, this object creates a
-    `thread-safe connection pool
+    have one instance per process for each database your process needs to talk
+    to. When instantiated, this object creates a `thread-safe connection pool
     <http://initd.org/psycopg/docs/pool.html#psycopg2.pool.ThreadedConnectionPool>`_,
-    which opens ``minconn`` connections immediately and up to ``maxconn``
-    according to demand.
+    which opens :py:attr:`minconn` connections immediately, and up to
+    :py:attr:`maxconn` according to demand. The fundamental value of a
+    :py:class:`~postgres.Postgres` instance is that it runs everything through
+    its connection pool.
 
     Features:
 
@@ -180,68 +182,67 @@ class Postgres(object):
     def execute(self, *a, **kw):
         """Execute the query and discard any results.
         """
-        with self.get_cursor(*a, **kw):
-            pass
+        with self.get_cursor() as cursor:
+            cursor.execute(*a, **kw)
 
     def fetchone(self, *a, **kw):
         """Execute the query and return a single result (``dict`` or ``None``).
         """
-        with self.get_cursor(*a, **kw) as cursor:
+        with self.get_cursor() as cursor:
+            cursor.execute(*a, **kw)
             return cursor.fetchone()
 
     def fetchall(self, *a, **kw):
         """Execute the query and yield the results (``dict``).
         """
-        with self.get_cursor(*a, **kw) as cursor:
+        with self.get_cursor() as cursor:
+            cursor.execute(*a, **kw)
             for row in cursor:
                 yield row
 
     def get_cursor(self, *a, **kw):
-        """Execute the query and return a context manager wrapping the cursor.
+        """Return a :py:class:`~postgres.CursorContextManager` that uses our connection pool.
 
-        The cursor is a psycopg2 RealDictCursor. The connection underlying the
-        cursor will be checked out of the connection pool and checked back in
-        upon both successful and exceptional executions against the cursor.
+        This is what :py:meth:`~postgres.Postgres.execute`,
+        :py:meth:`~postgres.Postgres.fetchone`, and
+        :py:meth:`~postgres.Postgres.fetchall` use under the hood. It's
+        probably less directly useful than
+        :py:meth:`~postgres.Postgres.get_transaction` and
+        :py:meth:`~postgres.Postgres.get_connection`.
 
         """
         return CursorContextManager(self.pool, *a, **kw)
 
     def get_transaction(self, *a, **kw):
-        """Return a context manager wrapping a transactional cursor.
+        """Return a :py:class:`~postgres.TransactionContextManager` that uses our connection pool.
 
-        This manager returns a cursor with autocommit turned off on its
-        connection. If the block under management raises then the connection is
-        rolled back. Otherwise it's committed. Use this when you want a series
-        of statements to be part of one transaction, but you don't need
-        fine-grained  control over the transaction.
+        Use this when you want a series of statements to be part of one
+        transaction, but you don't need fine-grained control over the
+        transaction.
 
         """
         return TransactionContextManager(self.pool, *a, **kw)
 
     def get_connection(self):
-        """Return a context manager wrapping a :py:class:`postgres.Connection`.
+        """Return a :py:class:`~postgres.ConnectionContextManager` that uses our connection pool.
 
-        This manager turns autocommit off, and back on when you're done with
-        the connection. The connection is rolled back on exit, so be sure to
-        call commit as needed. The idea is that you'd use this when you want
-        full fine-grained transaction control.
+        Use this when you want to take advantage of connection pooling, but
+        otherwise need full control, for example, to do complex things with
+        transactions.
 
         """
         return ConnectionContextManager(self.pool)
 
 
 class Connection(psycopg2.extensions.connection):
-    """This is a subclass of psycopg2.extensions.connection.
+    """This is a subclass of :py:class:`psycopg2.extensions.connection`.
 
-    Changes:
+    This class is used as the :py:attr:`connection_factory` for the connection
+    pool in :py:class:`Postgres`. Here are the differences from the base class:
 
-         - The DB-API 2.0 spec calls for transactions to be left open by
-           default. I don't think we want this. We set autocommit to
-           :py:class:True.
-
-        - We enforce UTF-8.
-
-        - We use RealDictCursor.
+        - We set :py:attr:`autocommit` to :py:const:`True`.
+        - We set the client encoding to ``UTF-8``.
+        - We use :py:class:`psycopg2.extras.RealDictCursor`.
 
     """
 
@@ -260,7 +261,15 @@ class Connection(psycopg2.extensions.connection):
 # ================
 
 class CursorContextManager(object):
-    """Instantiated once per cursor-level db access.
+    """Instantiated once per :py:func:`~postgres.Postgres.get_cursor` call.
+
+    The return value of :py:func:`CursorContextManager.__enter__` is a
+    :py:class:`psycopg2.extras.RealDictCursor`. Any positional and keyword
+    arguments to our constructor are passed through to the cursor constructor.
+    The :py:class:`~postgres.Connection` underlying the cursor is checked
+    out of the connection pool when the block starts, and checked back in when
+    the block ends.
+
     """
 
     def __init__(self, pool, *a, **kw):
@@ -273,16 +282,7 @@ class CursorContextManager(object):
         """Get a connection from the pool.
         """
         self.conn = self.pool.getconn()
-        cursor = self.conn.cursor()
-        try:
-            cursor.execute(*self.a, **self.kw)
-        except:
-            # If we get an exception from execute (like, the query fails:
-            # pretty common), then the __exit__ clause is not triggered. We
-            # trigger it ourselves to avoid draining the pool.
-            self.__exit__()
-            raise
-        return cursor
+        return self.conn.cursor(*self.a, **self.kw)
 
     def __exit__(self, *exc_info):
         """Put our connection back in the pool.
@@ -291,19 +291,32 @@ class CursorContextManager(object):
 
 
 class TransactionContextManager(object):
-    """Instantiated once per db.get_transaction call.
+    """Instantiated once per :py:func:`~postgres.Postgres.get_transaction` call.
+
+    The return value of :py:func:`TransactionContextManager.__enter__` is a
+    :py:class:`psycopg2.extras.RealDictCursor`. Any positional and keyword
+    arguments to our constructor are passed through to the cursor constructor.
+    When the block starts, the :py:class:`~postgres.Connection` underlying the
+    cursor is checked out of the connection pool and :py:attr:`autocommit` is
+    set to :py:const:`False`. If the block raises an exception, the
+    :py:class:`~postgres.Connection` is rolled back. Otherwise it's committed.
+    In either case, :py:attr:`autocommit` is restored to :py:const:`True` and
+    the :py:class:`~postgres.Connection` is put back in the pool.
+
     """
 
     def __init__(self, pool, *a, **kw):
         self.pool = pool
+        self.a = a
+        self.kw = kw
         self.conn = None
 
-    def __enter__(self, *a, **kw):
+    def __enter__(self):
         """Get a connection from the pool.
         """
         self.conn = self.pool.getconn()
         self.conn.autocommit = False
-        return self.conn.cursor(*a, **kw)
+        return self.conn.cursor(*self.a, **self.kw)
 
     def __exit__(self, *exc_info):
         """Put our connection back in the pool.
@@ -317,10 +330,19 @@ class TransactionContextManager(object):
 
 
 class ConnectionContextManager(object):
-    """Instantiated once per db.get_connection call.
+    """Instantiated once per :py:func:`~postgres.Postgres.get_connection` call.
+
+    The return value of :py:func:`ConnectionContextManager.__enter__` is a
+    :py:class:`postgres.Connection`. When the block starts, a
+    :py:class:`~postgres.Connection` is checked out of the connection pool and
+    :py:attr:`autocommit` is set to :py:const:`False`. When the block ends,
+    :py:attr:`autocommit` is restored to :py:const:`True` and the
+    :py:class:`~postgres.Connection` is rolled back before being put back in
+    the pool.
+
     """
 
-    def __init__(self, pool, *a, **kw):
+    def __init__(self, pool):
         self.pool = pool
         self.conn = None
 

@@ -62,7 +62,8 @@ class TestFetch(WithData):
 class TestCursor(WithData):
 
     def test_get_cursor_gets_a_cursor(self):
-        with self.db.get_cursor("SELECT * FROM foo ORDER BY bar") as cursor:
+        with self.db.get_cursor() as cursor:
+            cursor.execute("SELECT * FROM foo ORDER BY bar")
             actual = cursor.fetchall()
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
 

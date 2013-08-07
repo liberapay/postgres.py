@@ -2,5 +2,5 @@ postgres
 ========
 
 .. automodule:: postgres
-    :members: Postgres
+    :members:
     :member-order: bysource
