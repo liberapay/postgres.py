@@ -1,0 +1,16 @@
+language: python
+before_script:
+ - psql -U postgres -c 'CREATE DATABASE "test";'
+ - pip install pytest
+script: DATABASE_URL=postgres://postgres@localhost/test py.test tests.py -v
+notifications:
+  email: false
+  irc: 
+    channels:
+      - "irc.freenode.org#gittip"
+    on_success: change
+    on_failure: always
+    template:
+      - "%{repository} (%{branch}:%{commit} by %{author}): %{message} (%{build_url})"
+    skip_join: true
+
