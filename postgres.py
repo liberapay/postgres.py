@@ -39,12 +39,12 @@ Use :py:meth:`~postgres.Postgres.rows` to fetch all results:
 Bind Parameters
 +++++++++++++++
 
-In case you're not familiar with bind parameters in DB-API 2.0, the basic idea
-is that you put ``%(foo)s`` in your SQL strings, and then pass in a second
+In case you're not familiar with bind parameters in `DB-API 2.0`_, the basic
+idea is that you put ``%(foo)s`` in your SQL strings, and then pass in a second
 argument, a :py:class:`dict`, containing parameters that :py:mod:`psycopg2` (as
 an implementation of DB-API 2.0) will bind to the query in a way that is safe
-against SQL injection. (This is inspired by old-style Python string formatting,
-but it is not the same.)
+against `SQL injection`_. (This is inspired by old-style Python string
+formatting, but it is not the same.)
 
     >>> db.one("SELECT * FROM foo WHERE bar=%(bar)s", {"bar": "baz"})
     {'bar': 'baz'}
@@ -57,15 +57,17 @@ Always pass user input as bind parameters!
 Context Managers
 ++++++++++++++++
 
-Eighty percent of your database usage should be covered by the simple API
-above. For the other 20%, :py:mod:`postgres` provides context managers for
-working at increasingly lower levels of abstraction. The lowest level of
-abstraction in :py:mod:`postgres` is a :py:mod:`psycopg2` connection pool that
-we configure and manage for you. Everything in :py:mod:`postgres`, both the
-simple API and the context managers, uses this connection pool.
+Eighty percent of your database usage should be covered by the simple
+:py:meth:`~postgres.Postgres.run`, :py:meth:`~postgres.Postgres.one`,
+:py:meth:`~postgres.Postgres.rows` API introduced above. For the other 20%,
+:py:mod:`postgres` provides context managers for working at increasingly lower
+levels of abstraction. The lowest level of abstraction in :py:mod:`postgres` is
+a :py:mod:`psycopg2` connection pool that we configure and manage for you.
+Everything in :py:mod:`postgres`, both the simple API and the context managers,
+uses this connection pool.
 
-Here's how to work directly with a `psycogpg2 cursor
-<http://initd.org/psycopg/docs/cursor.html>`_ while still taking advantage of
+Here's how to work directly with a :py:mod:`psycogpg2.cursor` (`docs
+<http://initd.org/psycopg/docs/cursor.html>`_) while still taking advantage of
 connection pooling:
 
     >>> with db.get_cursor() as cursor:
@@ -124,6 +126,8 @@ API
 .. _psycopg2: http://initd.org/psycopg/
 .. _GitHub: https://github.com/gittip/postgres
 .. _PyPI: https://pypi.python.org/pypi/postgres
+.. _DB-API 2.0: http://www.python.org/dev/peps/pep-0249/
+.. _SQL injection: http://en.wikipedia.org/wiki/SQL_injection
 
 """
 from __future__ import unicode_literals
