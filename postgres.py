@@ -48,8 +48,8 @@ API
 ---
 
 .. _psycopg2: http://initd.org/psycopg/
+.. _GitHub: https://github.com/gittip/postgres
 .. _PyPI: https://pypi.python.org/pypi/postgres
-.. _GitHub: https://github.com/gittip/postgres-python
 
 """
 from __future__ import unicode_literals
