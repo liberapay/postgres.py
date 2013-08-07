@@ -99,7 +99,11 @@ API
 
 """
 from __future__ import unicode_literals
-import urlparse
+
+try:                    # Python 2
+    import urlparse
+except ImportError:     # Python 3
+    import urllib.parse as urlparse
 
 import psycopg2
 
