@@ -179,24 +179,29 @@ class Postgres(object):
                                   , connection_factory=Connection
                                    )
 
-    def execute(self, *a, **kw):
+    def execute(self, sql, parameters=None):
         """Execute the query and discard any results.
+
+        :param unicode sql: the SQL statement to execute
+        :param parameters: the bind parameters for the SQL statement
+        :type parameters: tuple or dict
+
         """
         with self.get_cursor() as cursor:
-            cursor.execute(*a, **kw)
+            cursor.execute(sql, parameters)
 
-    def fetchone(self, *a, **kw):
+    def fetchone(self, sql, parameters=None):
         """Execute the query and return a single result (``dict`` or ``None``).
         """
         with self.get_cursor() as cursor:
-            cursor.execute(*a, **kw)
+            cursor.execute(sql, parameters)
             return cursor.fetchone()
 
-    def fetchall(self, *a, **kw):
+    def fetchall(self, sql, parameters=None):
         """Execute the query and yield the results (``dict``).
         """
         with self.get_cursor() as cursor:
-            cursor.execute(*a, **kw)
+            cursor.execute(sql, parameters)
             for row in cursor:
                 yield row
 
