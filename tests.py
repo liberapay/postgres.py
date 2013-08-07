@@ -65,3 +65,49 @@ class TestCursor(WithData):
         with self.db.get_cursor("SELECT * FROM foo ORDER BY bar") as cursor:
             actual = cursor.fetchall()
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
+
+
+class TestTransaction(WithData):
+
+    def test_get_transaction_gets_a_transaction(self):
+        with self.db.get_transaction() as txn:
+            txn.execute("INSERT INTO foo VALUES ('blam')")
+            txn.execute("SELECT * FROM foo ORDER BY bar")
+            actual = txn.fetchall()
+        assert actual == [{"bar": "baz"}, {"bar": "blam"}, {"bar": "buz"}]
+
+    def test_transaction_is_isolated(self):
+        with self.db.get_transaction() as txn:
+            txn.execute("INSERT INTO foo VALUES ('blam')")
+            txn.execute("SELECT * FROM foo ORDER BY bar")
+            actual = list(self.db.fetchall("SELECT * FROM foo ORDER BY bar"))
+        assert actual == [{"bar": "baz"}, {"bar": "buz"}]
+
+    def test_transaction_commits_on_success(self):
+        with self.db.get_transaction() as txn:
+            txn.execute("INSERT INTO foo VALUES ('blam')")
+            txn.execute("SELECT * FROM foo ORDER BY bar")
+        actual = list(self.db.fetchall("SELECT * FROM foo ORDER BY bar"))
+        assert actual == [{"bar": "baz"}, {"bar": "blam"}, {"bar": "buz"}]
+
+    def test_transaction_rolls_back_on_failure(self):
+        class Heck(Exception): pass
+        try:
+            with self.db.get_transaction() as txn:
+                txn.execute("INSERT INTO foo VALUES ('blam')")
+                txn.execute("SELECT * FROM foo ORDER BY bar")
+                raise Heck
+        except Heck:
+            pass
+        actual = list(self.db.fetchall("SELECT * FROM foo ORDER BY bar"))
+        assert actual == [{"bar": "baz"}, {"bar": "buz"}]
+
+
+class TestConnection(WithData):
+
+    def test_get_connection_gets_a_connection(self):
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM foo ORDER BY bar")
+            actual = cursor.fetchall()
+        assert actual == [{"bar": "baz"}, {"bar": "buz"}]
