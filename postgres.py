@@ -35,10 +35,59 @@ Use it to fetch one result:
     >>> db.fetchone("SELECT * FROM foo WHERE bar='blam'")
     None
 
-Work with a cursor directly:
+
+Context Managers
+++++++++++++++++
+
+Eighty percent of your database usage should be covered by the simple API
+above. For the other 20%, :py:mod:`postgres` provides context managers for
+working at increasingly lower levels of abstraction. The lowest level of
+abstraction in :py:mod:`postgres` is a :py:mod:`psycopg2` connection pool that
+we configure and manage for you. Everything in :py:mod:`postgres`, both the
+simple API and the context managers, uses this connection pool.
+
+Here's how to work directly with a `psycogpg2 cursor
+<http://initd.org/psycopg/docs/cursor.html>`_ while still taking advantage of
+connection pooling:
 
     >>> with db.get_cursor('SELECT * FROM foo ORDER BY bar') as cursor:
     ...     results = cursor.fetchall()
+
+A cursor you get from :py:func:`~postgres.Postgres.get_cursor` has
+``autocommit`` turned on for its connection, so every call you make using such
+a cursor will be isolated in a separate transaction. Need to include multiple
+calls in a single transaction? Use the
+:py:func:`~postgres.Postgres.get_transaction` context manager:
+
+    >>> with db.get_transaction() as txn:
+    ...     txn.execute("INSERT INTO foo VALUES ('blam')")
+    ...     txn.execute("SELECT * FROM foo ORDER BY bar")
+    ...     txn.fetchall()
+    [{"bar": "baz"}, {"bar": "blam"}, {"bar": "buz"}]
+    ...
+    ...     db.fetchall("SELECT * FROM foo ORDER BY bar")
+    [{"bar": "baz"}, {"bar": "buz"}]
+    ...
+    ... db.fetchall("SELECT * FROM foo ORDER BY bar")
+    [{"bar": "baz"}, {"bar": "blam"}, {"bar": "buz"}]
+
+The :py:func:`~postgres.Postgres.get_transaction` manager gives you a cursor
+with ``autocommit`` turned off on its connection. If the block under management
+raises, the connection is rolled back. Otherwise it's committed.  Use this when
+you want a series of statements to be part of one transaction, but you don't
+need fine-grained control over the transaction. For fine-grained control, use
+:py:func:`~postgres.Postgres.get_connection` to get a connection straight from
+the connection pool:
+
+    >>> with db.get_connection() as connection:
+    ...     cursor = connection.cursor()
+    ...     cursor.execute('SELECT * FROM foo ORDER BY bar')
+    ...     cursor.fetchall()
+    [{"bar": "baz"}, {"bar": "buz"}]
+
+A connection gotten in this way will have ``autocommit`` turned off, and it'll
+never be implicitly committed otherwise. It'll actually be rolled back when
+you're done with it, so it's up to you to explicitly commit as needed.
 
 
 API
@@ -150,15 +199,23 @@ class Postgres(object):
 
     def get_transaction(self, *a, **kw):
         """Return a context manager wrapping a transactional cursor.
+
+        This manager returns a cursor with autocommit turned off on its
+        connection. If the block under management raises then the connection is
+        rolled back. Otherwise it's committed. Use this when you want a series
+        of statements to be part of one transaction, but you don't need
+        fine-grained  control over the transaction.
+
         """
         return PostgresTransactionContextManager(self.pool, *a, **kw)
 
     def get_connection(self):
         """Return a context manager wrapping a PostgresConnection.
 
-        The manager turns autocommit off for you and then turns it on again
-        when you're done with it. Use this when you need fine-grained
-        transaction control.
+        This manager turns autocommit off, and back on when you're done with
+        the connection. The connection is rolled back on exit, so be sure to
+        call commit as needed. The idea is that you'd use this when you want
+        full fine-grained transaction control.
 
         """
         return PostgresConnectionContextManager(self.pool)
@@ -192,13 +249,6 @@ class PostgresConnection(psycopg2.extensions.connection):
 
 class PostgresTransactionContextManager(object):
     """Instantiated once per db.get_transaction call.
-
-    This manager gives you a cursor with autocommit turned off on its
-    connection. If the block under management raises then the connection is
-    rolled back. Otherwise it's committed. Use this when you want a series of
-    statements to be part of one transaction, but you don't need fine-grained
-    control over the transaction.
-
     """
 
     def __init__(self, pool, *a, **kw):
@@ -225,12 +275,6 @@ class PostgresTransactionContextManager(object):
 
 class PostgresConnectionContextManager(object):
     """Instantiated once per db.get_connection call.
-
-    This manager turns autocommit off, and back on when you're done with it.
-    The connection is rolled back on exit, so be sure to call commit as needed.
-    The idea is that you'd use this when you want full fine-grained transaction
-    control.
-
     """
 
     def __init__(self, pool, *a, **kw):
