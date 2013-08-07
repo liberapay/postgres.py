@@ -215,7 +215,7 @@ class Postgres(object):
         """
         with self.get_cursor() as cursor:
             cursor.execute(sql, parameters)
-            return list(cursor)
+            return cursor.fetchall()
 
     def get_cursor(self, *a, **kw):
         """Return a :py:class:`~postgres.CursorContextManager` that uses our
