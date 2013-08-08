@@ -28,7 +28,7 @@ Use :py:meth:`~postgres.Postgres.one` to fetch one result:
     >>> db.one("SELECT * FROM foo ORDER BY bar")
     {'bar': 'baz'}
     >>> db.one("SELECT * FROM foo WHERE bar='blam'")
-    None
+    >>> # None
 
 Use :py:meth:`~postgres.Postgres.rows` to fetch all results:
 
@@ -62,12 +62,13 @@ Eighty percent of your database usage should be covered by the simple
 :py:meth:`~postgres.Postgres.rows` API introduced above. For the other 20%,
 :py:mod:`postgres` provides context managers for working at increasingly lower
 levels of abstraction. The lowest level of abstraction in :py:mod:`postgres` is
-a :py:mod:`psycopg2` connection pool that we configure and manage for you.
-Everything in :py:mod:`postgres`, both the simple API and the context managers,
-uses this connection pool.
+a :py:mod:`psycopg2` `connection pool
+<http://initd.org/psycopg/docs/pool.html>`_ that we configure and manage for
+you. Everything in :py:mod:`postgres`, both the simple API and the context
+managers, uses this connection pool.
 
-Here's how to work directly with a :py:mod:`psycogpg2.cursor` (`docs
-<http://initd.org/psycopg/docs/cursor.html>`_) while still taking advantage of
+Here's how to work directly with a :py:mod:`psycogpg2` `cursor
+<http://initd.org/psycopg/docs/cursor.html>`_ while still taking advantage of
 connection pooling:
 
     >>> with db.get_cursor() as cursor:
@@ -90,7 +91,7 @@ multiple calls in a single transaction? Use the
     [{'bar': 'baz'}, {'bar': 'blam'}, {'bar': 'buz'}]
 
 Note that other calls won't see the changes on your transaction until the end
-of your code block, when the context manager commits the transaction::
+of your code block, when the context manager commits the transaction for you::
 
     >>> with db.get_transaction() as txn:
     ...     txn.execute("INSERT INTO foo VALUES ('blam')")
@@ -102,11 +103,11 @@ of your code block, when the context manager commits the transaction::
 
 The :py:func:`~postgres.Postgres.get_transaction` manager gives you a cursor
 with :py:attr:`autocommit` turned off on its connection. If the block under
-management raises, the connection is rolled back. Otherwise it's committed.
-Use this when you want a series of statements to be part of one transaction,
-but you don't need fine-grained control over the transaction. For fine-grained
-control, use :py:func:`~postgres.Postgres.get_connection` to get a connection
-straight from the connection pool:
+management raises an exception, the connection is rolled back. Otherwise it's
+committed. Use this when you want a series of statements to be part of one
+transaction, but you don't need fine-grained control over the transaction. For
+fine-grained control, use :py:func:`~postgres.Postgres.get_connection` to get a
+connection straight from the connection pool:
 
     >>> with db.get_connection() as connection:
     ...     cursor = connection.cursor()
@@ -118,6 +119,8 @@ straight from the connection pool:
 A connection gotten in this way will have :py:attr:`autocommit` turned off, and
 it'll never be implicitly committed otherwise. It'll actually be rolled back
 when you're done with it, so it's up to you to explicitly commit as needed.
+This is the lowest-level abstraction that :py:mod:`postgres` provides,
+basically just a pre-configured connection pool from :py:mod:`psycopg2`.
 
 
 API
