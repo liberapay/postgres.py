@@ -300,12 +300,15 @@ class Postgres(object):
         :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
 
         By default, :py:attr:`strict` ends up evaluating to :py:class:`True`,
-        in which case we raise :py:exc:`~postgres.TooFew` or
-        :py:exc:`~postgres.TooMany` if the number of rows returned isn't
-        exactly one. You can override this behavior per-call with the
-        :py:attr:`strict` argument here, or globally by passing
-        :py:attr:`strict_one` to the :py:class:`~postgres.Postgres`
-        constructor. If you use both, the :py:attr:`strict` argument here wins.
+        in which case we raise :py:exc:`postgres.TooFew` or
+        :py:exc:`postgres.TooMany` if the number of rows returned isn't exactly
+        one (both are subclasses of :py:exc:`postgres.NotOne`). You can
+        override this behavior per-call with the :py:attr:`strict` argument
+        here, or globally by passing :py:attr:`strict_one` to the
+        :py:class:`~postgres.Postgres` constructor. If you use both, the
+        :py:attr:`strict` argument here wins. If you pass :py:class:`False`
+        for :py:attr:`strict`, then we return :py:class:`None` if there are no
+        results, and the first if there is more than one.
 
         >>> row = db.one("SELECT * FROM foo WHERE bar='baz'")
         >>> print(row["bar"])
