@@ -12,10 +12,6 @@ We `test <https://travis-ci.org/gittip/postgres.py>`_ against Python 2.6, 2.7,
 3.2, and 3.3. We don't yet have a testing matrix for different versions of
 :py:mod:`psycopg2` or PostgreSQL.
 
-Importing :py:mod:`postgres` under Python 2 will cause the registration of
-typecasters with :py:mod:`psycopg2` to ensure that you get unicode instead of
-bytestrings for text data, according to `this advice`_.
-
 :py:mod:`postgres` is in the `public domain`_.
 
 
@@ -219,8 +215,16 @@ class Postgres(object):
 
     This is the main object that :py:mod:`postgres` provides, and you should
     have one instance per process for each PostgreSQL database your process
-    wants to talk to using this library. When instantiated, this object creates
-    a `thread-safe connection pool
+    wants to talk to using this library.
+
+    >>> import postgres
+    >>> db = postgres.Postgres("postgres://jrandom@localhost/test")
+
+    (Note that importing :py:mod:`postgres` under Python 2 will cause the
+    registration of typecasters with :py:mod:`psycopg2` to ensure that you get
+    unicode instead of bytestrings for text data, according to `this advice`_.)
+
+    When instantiated, this object creates a `thread-safe connection pool
     <http://initd.org/psycopg/docs/pool.html#psycopg2.pool.ThreadedConnectionPool>`_,
     which opens :py:attr:`minconn` connections immediately, and up to
     :py:attr:`maxconn` according to demand. The fundamental value of a
@@ -246,9 +250,6 @@ class Postgres(object):
     you're using DB-API 2.0 (:py:meth:`execute` + :py:meth:`fetch*`), not our
     simple API (:py:meth:`~postgres.Postgres.run` /
     :py:meth:`~postgres.Postgres.one` / :py:meth:`~postgres.Postgres.rows`).
-
-    >>> import postgres
-    >>> db = postgres.Postgres("postgres://jrandom@localhost/test")
 
     .. _this ticket: https://github.com/gittip/postgres.py/issues/16
 
