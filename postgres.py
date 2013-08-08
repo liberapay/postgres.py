@@ -166,6 +166,9 @@ from psycopg2.extras import RealDictCursor
 from psycopg2.pool import ThreadedConnectionPool as ConnectionPool
 
 
+__version__ = '1.0.0'
+
+
 # A Helper
 # ========
 # Heroku gives us an URL, psycopg2 wants a DSN. Convert!
