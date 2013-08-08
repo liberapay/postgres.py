@@ -209,7 +209,8 @@ class Postgres(object):
 
     :param unicode url: A ``postgres://`` URL or a `PostgreSQL connection string <http://www.postgresql.org/docs/current/static/libpq-connect.html>`_
     :param int minconn: The minimum size of the connection pool
-    :param int maxconn: The minimum size of the connection pool
+    :param int maxconn: The maximum size of the connection pool
+    :param cursor_factory: Defaults to :py:class:`~psycopg2.extras.RealDictCursor`
     :param strict_one: The default :py:attr:`strict` parameter for :py:meth:`~postgres.Postgres.one`
     :type strict_one: :py:class:`bool`
 
@@ -222,6 +223,11 @@ class Postgres(object):
     :py:attr:`maxconn` according to demand. The fundamental value of a
     :py:class:`~postgres.Postgres` instance is that it runs everything through
     its connection pool.
+
+    Check the :py:mod:`psycopg2` `docs
+    <http://initd.org/psycopg/docs/extras.html#connection-and-cursor-subclasses>`_
+    for additional :py:attr:`cursor_factories`, such as
+    :py:class:`NamedTupleCursor`.
 
     The names in our simple API, :py:meth:`~postgres.Postgres.run`,
     :py:meth:`~postgres.Postgres.one`, and :py:meth:`~postgres.Postgres.rows`,
@@ -242,9 +248,12 @@ class Postgres(object):
 
     """
 
-    def __init__(self, url, minconn=1, maxconn=10, strict_one=None):
+    def __init__(self, url, minconn=1, maxconn=10, \
+                               cursor_factory=RealDictCursor, strict_one=None):
         if url.startswith("postgres://"):
             dsn = url_to_dsn(url)
+
+        Connection.cursor_factory = cursor_factory
 
         self.pool = ConnectionPool( minconn=minconn
                                   , maxconn=maxconn
@@ -400,9 +409,11 @@ class Connection(psycopg2.extensions.connection):
 
         - We set :py:attr:`autocommit` to :py:const:`True`.
         - We set the client encoding to ``UTF-8``.
-        - We use :py:class:`psycopg2.extras.RealDictCursor`.
+        - We use :py:attr:`self.cursor_factory`.
 
     """
+
+    cursor_factory = None   # set this before using this object
 
     def __init__(self, *a, **kw):
         psycopg2.extensions.connection.__init__(self, *a, **kw)
@@ -411,7 +422,7 @@ class Connection(psycopg2.extensions.connection):
 
     def cursor(self, *a, **kw):
         if 'cursor_factory' not in kw:
-            kw['cursor_factory'] = RealDictCursor
+            kw['cursor_factory'] = self.cursor_factory
         return psycopg2.extensions.connection.cursor(self, *a, **kw)
 
 

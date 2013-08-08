@@ -1,9 +1,11 @@
 from __future__ import unicode_literals
 
 import os
+from collections import namedtuple
 from unittest import TestCase
 
 from postgres import Postgres, TooFew, TooMany
+from psycopg2.extras import NamedTupleCursor
 
 
 DATABASE_URL = os.environ['DATABASE_URL']
@@ -259,3 +261,29 @@ class TestConnection(WithData):
             cursor.execute("SELECT * FROM foo ORDER BY bar")
             actual = cursor.fetchall()
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
+
+
+# cursor_factory
+# ==============
+
+class TestCursorFactory(WithData):
+
+    def setUp(self):                    # override
+        self.db = Postgres(DATABASE_URL, cursor_factory=NamedTupleCursor)
+        self.db.run("DROP SCHEMA IF EXISTS public CASCADE")
+        self.db.run("CREATE SCHEMA public")
+        self.db.run("CREATE TABLE foo (bar text)")
+        self.db.run("INSERT INTO foo VALUES ('baz')")
+        self.db.run("INSERT INTO foo VALUES ('buz')")
+
+    def test_NamedDictCursor_results_in_namedtuples(self):
+        Record = namedtuple("Record", ["bar"])
+        expected = [Record(bar="baz"), Record(bar="buz")]
+        actual = self.db.rows("SELECT * FROM foo ORDER BY bar")
+        assert actual == expected
+
+    def test_NamedDictCursor_results_in_namedtuples(self):
+        Record = namedtuple("Record", ["bar"])
+        expected = [Record(bar="baz"), Record(bar="buz")]
+        actual = self.db.rows("SELECT * FROM foo ORDER BY bar")
+        assert actual == expected
