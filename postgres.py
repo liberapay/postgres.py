@@ -192,7 +192,7 @@ class NotOne(Exception):
     def __init__(self, rowcount):
         self.rowcount = rowcount
     def __str__(self):
-        return "Got {} rows instead of 1.".format(self.rowcount)
+        return "Got {0} rows instead of 1.".format(self.rowcount)
 
 class TooFew(NotOne): pass
 class TooMany(NotOne): pass
