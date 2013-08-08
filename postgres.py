@@ -162,7 +162,7 @@ from psycopg2.extras import RealDictCursor
 from psycopg2.pool import ThreadedConnectionPool as ConnectionPool
 
 
-__version__ = '1.0.0-dev'
+__version__ = '1.0.1'
 
 
 # A Helper
