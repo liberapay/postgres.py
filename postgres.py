@@ -23,12 +23,11 @@ Use :py:meth:`~postgres.Postgres.run` to run SQL statements:
     >>> db.run("INSERT INTO foo VALUES ('baz')")
     >>> db.run("INSERT INTO foo VALUES ('buz')")
 
-Use :py:meth:`~postgres.Postgres.one` to fetch one result:
+Use :py:meth:`~postgres.Postgres.one` to fetch exactly one result:
 
-    >>> db.one("SELECT * FROM foo ORDER BY bar")
+    >>> db.one("SELECT * FROM foo WHERE bar='baz'")
     {'bar': 'baz'}
-    >>> db.one("SELECT * FROM foo WHERE bar='blam'")
-    >>> # None
+
 
 Use :py:meth:`~postgres.Postgres.rows` to fetch all results:
 
@@ -177,6 +176,19 @@ def url_to_dsn(url):
     return dsn
 
 
+# Exceptions
+# ==========
+
+class NotOne(Exception):
+    def __init__(self, rowcount):
+        self.rowcount = rowcount
+    def __str__(self):
+        return "Got {} rows instead of 1.".format(self.rowcount)
+
+class TooFew(NotOne): pass
+class TooMany(NotOne): pass
+
+
 # The Main Event
 # ==============
 
@@ -186,6 +198,8 @@ class Postgres(object):
     :param unicode url: A ``postgres://`` URL or a `PostgreSQL connection string <http://www.postgresql.org/docs/current/static/libpq-connect.html>`_
     :param int minconn: The minimum size of the connection pool
     :param int maxconn: The minimum size of the connection pool
+    :param strict_one: The default :py:attr:`strict` parameter for :py:meth:`~postgres.Postgres.one`
+    :type strict_one: :py:class:`bool`
 
     This is the main object that :py:mod:`postgres` provides, and you should
     have one instance per process for each PostgreSQL database your process
@@ -220,14 +234,19 @@ class Postgres(object):
 
     """
 
-    def __init__(self, url, minconn=1, maxconn=10):
+    def __init__(self, url, minconn=1, maxconn=10, strict_one=None):
         if url.startswith("postgres://"):
             dsn = url_to_dsn(url)
+
         self.pool = ConnectionPool( minconn=minconn
                                   , maxconn=maxconn
                                   , dsn=dsn
                                   , connection_factory=Connection
                                    )
+
+        if strict_one not in (True, False, None):
+            raise ValueError("strict_one must be True, False, or None.")
+        self.strict_one = strict_one
 
     def run(self, sql, parameters=None):
         """Execute a query and discard any results.
@@ -245,21 +264,48 @@ class Postgres(object):
         with self.get_cursor() as cursor:
             cursor.execute(sql, parameters)
 
-    def one(self, sql, parameters=None):
+    def one(self, sql, parameters=None, strict=None):
         """Execute a query and return a single result.
 
         :param unicode sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
         :type parameters: dict or tuple
+        :param strict: whether to raise when there isn't exactly one result
+        :type strict: :py:class:`bool`
         :returns: :py:class:`dict` or :py:const:`None`
+        :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
+
+        By default, :py:attr:`strict` ends up evaluating to :py:class:`True`,
+        in which case we raise :py:exc:`~postgres.TooFew` or
+        :py:exc:`~postgres.TooMany` if the number of rows returned isn't
+        exactly one. You can override this behavior per-call with the
+        :py:attr:`strict` argument here, or globally by passing
+        :py:attr:`strict_one` to the :py:class:`~postgres.Postgres`
+        constructor. If you use both, the :py:attr:`strict` argument here wins.
 
         >>> row = db.one("SELECT * FROM foo WHERE bar='baz'"):
         >>> print(row["bar"])
         baz
 
         """
+        if strict not in (True, False, None):
+            raise ValueError("strict must be True, False, or None.")
+
+        if strict is None:
+            if self.strict_one is None:
+                strict = True               # library default
+            else:
+                strict = self.strict_one    # user default
+
         with self.get_cursor() as cursor:
             cursor.execute(sql, parameters)
+
+            if strict:
+                if cursor.rowcount < 1:
+                    raise TooFew(cursor.rowcount)
+                elif cursor.rowcount > 1:
+                    raise TooMany(cursor.rowcount)
+
             return cursor.fetchone()
 
     def rows(self, sql, parameters=None):

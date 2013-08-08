@@ -3,11 +3,14 @@ from __future__ import unicode_literals
 import os
 from unittest import TestCase
 
-from postgres import Postgres
+from postgres import Postgres, TooFew, TooMany
 
 
 DATABASE_URL = os.environ['DATABASE_URL']
 
+
+# harnesses
+# =========
 
 class WithSchema(TestCase):
 
@@ -18,6 +21,7 @@ class WithSchema(TestCase):
 
     def tearDown(self):
         self.db.run("DROP SCHEMA IF EXISTS public CASCADE")
+        del self.db
 
 
 class WithData(WithSchema):
@@ -28,6 +32,9 @@ class WithData(WithSchema):
         self.db.run("INSERT INTO foo VALUES ('baz')")
         self.db.run("INSERT INTO foo VALUES ('buz')")
 
+
+# db.run
+# ======
 
 class TestRun(WithSchema):
 
@@ -44,15 +51,125 @@ class TestRun(WithSchema):
         assert actual == 1
 
 
-class TestOneAndRows(WithData):
+# db.one
+# ======
+# With all the combinations of strict_one and strict, we end up with a number
+# of tests here. Since the behavior of the one method with a strict parameter
+# of True or False is expected to be the same regardless of what strict_one is
+# set to, we can write those once and then use the TestOne TestCase as the base
+# class for other TestCases that vary the strict_one attribute. The TestOne
+# tests will be re-run in each new context.
 
-    def test_one_fetches_the_first_one(self):
+class TestNotOneException(WithData):
+
+    def test_TooFew_message_is_helpful(self):
+        try:
+            self.db.one("SELECT * FROM foo WHERE bar='blah'", strict=True)
+        except TooFew, exc:
+            actual = str(exc)
+            assert actual == "Got 0 rows instead of 1."
+
+    def test_TooMany_message_is_helpful(self):
+        try:
+            self.db.one("SELECT * FROM foo", strict=True)
+        except TooMany, exc:
+            actual = str(exc)
+            assert actual == "Got 2 rows instead of 1."
+
+
+class TestOne(WithData):
+
+    def test_with_strict_True_one_raises_TooFew(self):
+        self.assertRaises( TooFew
+                         , self.db.one
+                         , "SELECT * FROM foo WHERE bar='blah'"
+                         , strict=True
+                          )
+
+    def test_with_strict_True_one_fetches_the_one(self):
+        actual = self.db.one("SELECT * FROM foo WHERE bar='baz'", strict=True)
+        assert actual == {"bar": "baz"}
+
+    def test_with_strict_True_one_raises_TooMany(self):
+        self.assertRaises( TooMany
+                         , self.db.one
+                         , "SELECT * FROM foo"
+                         , strict=True
+                          )
+
+
+    def test_with_strict_False_one_returns_None_if_theres_none(self):
+        actual = self.db.one("SELECT * FROM foo WHERE bar='nun'", strict=False)
+        assert actual is None
+
+    def test_with_strict_False_one_fetches_the_first_one(self):
+        actual = self.db.one("SELECT * FROM foo ORDER BY bar", strict=False)
+        assert actual == {"bar": "baz"}
+
+
+class TestOne_StrictOneNone(TestOne):
+
+    def setUp(self):
+        WithData.setUp(self)
+        self.db.strict_one = None
+
+    def test_one_raises_TooFew(self):
+        self.assertRaises( TooFew
+                         , self.db.one
+                         , "SELECT * FROM foo WHERE bar='nun'"
+                          )
+
+    def test_one_returns_one(self):
+        actual = self.db.one("SELECT * FROM foo WHERE bar='baz'")
+        assert actual == {"bar": "baz"}
+
+    def test_one_raises_TooMany(self):
+        self.assertRaises(TooMany, self.db.one, "SELECT * FROM foo")
+
+
+class TestOne_StrictOneFalse(TestOne):
+
+    def setUp(self):
+        WithData.setUp(self)
+        self.db.strict_one = False
+
+    def test_one_returns_None(self):
+        actual = self.db.one("SELECT * FROM foo WHERE bar='nun'")
+        assert actual is None
+
+    def test_one_returns_one(self):
+        actual = self.db.one("SELECT * FROM foo WHERE bar='baz'")
+        assert actual == {"bar": "baz"}
+
+    def test_one_returns_first_one(self):
         actual = self.db.one("SELECT * FROM foo ORDER BY bar")
         assert actual == {"bar": "baz"}
 
-    def test_one_returns_None_if_theres_none(self):
-        actual = self.db.one("SELECT * FROM foo WHERE bar='blam'")
-        assert actual is None
+
+class TestOne_StrictOneTrue(TestOne):
+
+    def setUp(self):
+        WithData.setUp(self)
+        self.db.strict_one = True
+
+    def test_one_raises_TooFew(self):
+        self.assertRaises( TooFew
+                         , self.db.one
+                         , "SELECT * FROM foo WHERE bar='nun'"
+                          )
+
+    def test_one_returns_one(self):
+        actual = self.db.one("SELECT * FROM foo WHERE bar='baz'")
+        assert actual == {"bar": "baz"}
+
+    def test_one_raises_TooMany(self):
+        self.assertRaises(TooMany, self.db.one, "SELECT * FROM foo")
+
+
+# db.rows
+# =======
+
+class TestRows(WithData):
 
     def test_rows_fetches_all_rows(self):
         actual = self.db.rows("SELECT * FROM foo ORDER BY bar")
@@ -67,6 +184,9 @@ class TestOneAndRows(WithData):
         actual = self.db.rows("SELECT * FROM foo WHERE bar=%s", ("baz",))
         assert actual == [{"bar": "baz"}]
 
+
+# db.get_cursor
+# =============
 
 class TestCursor(WithData):
 
@@ -88,6 +208,9 @@ class TestCursor(WithData):
             actual = cursor.closed
         assert not actual
 
+
+# db.get_transaction
+# ==================
 
 class TestTransaction(WithData):
 
@@ -124,6 +247,9 @@ class TestTransaction(WithData):
         actual = self.db.rows("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
 
+
+# db.get_connection
+# =================
 
 class TestConnection(WithData):
 
