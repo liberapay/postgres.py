@@ -1,3 +1,4 @@
 env
+dist
 distribute-*
 docs/_build
