@@ -333,7 +333,7 @@ class Postgres(object):
             return cursor.fetchone()
 
     def all(self, sql, parameters=None):
-        """Execute a query and return all resulting rows.
+        """Execute a query and return all results.
 
         :param unicode sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
