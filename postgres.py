@@ -239,15 +239,18 @@ class Postgres(object):
     methods, which have slightly different semantics (under DB-API 2.0 you call
     :py:meth:`execute` on a cursor and then call one of the :py:meth:`fetch*`
     methods on the same cursor to retrieve rows; with our simple API there is
-    no second :py:meth:`fetch` step). The context managers on this class are
-    named starting with :py:meth:`get_` to set them apart from the simple-case
-    API.  Note that when working inside a block under one of the context
-    managers, you're using DB-API 2.0 (:py:meth:`execute` + :py:meth:`fetch*`),
-    not our simple API (:py:meth:`~postgres.Postgres.run` /
+    no second :py:meth:`fetch` step). See `this ticket`_ for more of the
+    rationale behind these names. The context managers on this class are named
+    starting with :py:meth:`get_` to set them apart from the simple-case API.
+    Note that when working inside a block under one of the context managers,
+    you're using DB-API 2.0 (:py:meth:`execute` + :py:meth:`fetch*`), not our
+    simple API (:py:meth:`~postgres.Postgres.run` /
     :py:meth:`~postgres.Postgres.one` / :py:meth:`~postgres.Postgres.rows`).
 
     >>> import postgres
     >>> db = postgres.Postgres("postgres://jrandom@localhost/test")
+
+    .. _this ticket: https://github.com/gittip/postgres.py/issues/16
 
     """
 
