@@ -307,7 +307,7 @@ class Postgres(object):
         :py:attr:`strict_one` to the :py:class:`~postgres.Postgres`
         constructor. If you use both, the :py:attr:`strict` argument here wins.
 
-        >>> row = db.one("SELECT * FROM foo WHERE bar='baz'"):
+        >>> row = db.one("SELECT * FROM foo WHERE bar='baz'")
         >>> print(row["bar"])
         baz
 
