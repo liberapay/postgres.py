@@ -13,8 +13,10 @@ We `test <https://travis-ci.org/gittip/postgres.py>`_ against Python 2.6, 2.7,
 :py:mod:`psycopg2` or PostgreSQL.
 
 Importing :py:mod:`postgres` under Python 2 will cause the registration of
-typecasters in psycopg2 to ensure that you get unicode instead of bytestrings
-for text data, according to `this advice`_.
+typecasters with :py:mod:`psycopg2` to ensure that you get unicode instead of
+bytestrings for text data, according to `this advice`_.
+
+:py:mod:`postgres` is in the `public domain`_.
 
 
 Tutorial
@@ -137,6 +139,7 @@ API
 .. _GitHub: https://github.com/gittip/postgres
 .. _PyPI: https://pypi.python.org/pypi/postgres
 .. _this advice: http://initd.org/psycopg/docs/usage.html#unicode-handling
+.. _public domain: http://creativecommons.org/publicdomain/zero/1.0/
 .. _DB-API 2.0: http://www.python.org/dev/peps/pep-0249/
 .. _SQL injection: http://en.wikipedia.org/wiki/SQL_injection
 
