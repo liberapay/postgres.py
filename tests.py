@@ -42,8 +42,8 @@ class TestRun(WithSchema):
 
     def test_run_runs(self):
         self.db.run("CREATE TABLE foo (bar text)")
-        actual = self.db.rows("SELECT tablename FROM pg_tables "
-                              "WHERE schemaname='public'")
+        actual = self.db.all("SELECT tablename FROM pg_tables "
+                             "WHERE schemaname='public'")
         assert actual == [{"tablename": "foo"}]
 
     def test_run_inserts(self):
@@ -168,22 +168,22 @@ class TestOne_StrictOneTrue(TestOne):
         self.assertRaises(TooMany, self.db.one, "SELECT * FROM foo")
 
 
-# db.rows
-# =======
+# db.all
+# ======
 
 class TestRows(WithData):
 
     def test_rows_fetches_all_rows(self):
-        actual = self.db.rows("SELECT * FROM foo ORDER BY bar")
+        actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
 
     def test_bind_parameters_as_dict_work(self):
         params = {"bar": "baz"}
-        actual = self.db.rows("SELECT * FROM foo WHERE bar=%(bar)s", params)
+        actual = self.db.all("SELECT * FROM foo WHERE bar=%(bar)s", params)
         assert actual == [{"bar": "baz"}]
 
     def test_bind_parameters_as_tuple_work(self):
-        actual = self.db.rows("SELECT * FROM foo WHERE bar=%s", ("baz",))
+        actual = self.db.all("SELECT * FROM foo WHERE bar=%s", ("baz",))
         assert actual == [{"bar": "baz"}]
 
 
@@ -227,14 +227,14 @@ class TestTransaction(WithData):
         with self.db.get_transaction() as txn:
             txn.execute("INSERT INTO foo VALUES ('blam')")
             txn.execute("SELECT * FROM foo ORDER BY bar")
-            actual = self.db.rows("SELECT * FROM foo ORDER BY bar")
+            actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
 
     def test_transaction_commits_on_success(self):
         with self.db.get_transaction() as txn:
             txn.execute("INSERT INTO foo VALUES ('blam')")
             txn.execute("SELECT * FROM foo ORDER BY bar")
-        actual = self.db.rows("SELECT * FROM foo ORDER BY bar")
+        actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "blam"}, {"bar": "buz"}]
 
     def test_transaction_rolls_back_on_failure(self):
@@ -246,7 +246,7 @@ class TestTransaction(WithData):
                 raise Heck
         except Heck:
             pass
-        actual = self.db.rows("SELECT * FROM foo ORDER BY bar")
+        actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
 
 
@@ -279,11 +279,11 @@ class TestCursorFactory(WithData):
     def test_NamedDictCursor_results_in_namedtuples(self):
         Record = namedtuple("Record", ["bar"])
         expected = [Record(bar="baz"), Record(bar="buz")]
-        actual = self.db.rows("SELECT * FROM foo ORDER BY bar")
+        actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == expected
 
     def test_NamedDictCursor_results_in_namedtuples(self):
         Record = namedtuple("Record", ["bar"])
         expected = [Record(bar="baz"), Record(bar="buz")]
-        actual = self.db.rows("SELECT * FROM foo ORDER BY bar")
+        actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == expected

@@ -35,9 +35,9 @@ Use :py:meth:`~postgres.Postgres.one` to fetch exactly one result:
     {'bar': 'baz'}
 
 
-Use :py:meth:`~postgres.Postgres.rows` to fetch all results:
+Use :py:meth:`~postgres.Postgres.all` to fetch all results:
 
-    >>> db.rows("SELECT * FROM foo ORDER BY bar")
+    >>> db.all("SELECT * FROM foo ORDER BY bar")
     [{'bar': 'baz'}, {'bar': 'buz'}]
 
 
@@ -64,7 +64,7 @@ Context Managers
 
 Eighty percent of your database usage should be covered by the simple
 :py:meth:`~postgres.Postgres.run`, :py:meth:`~postgres.Postgres.one`,
-:py:meth:`~postgres.Postgres.rows` API introduced above. For the other 20%,
+:py:meth:`~postgres.Postgres.all` API introduced above. For the other 20%,
 :py:mod:`postgres` provides context managers for working at increasingly lower
 levels of abstraction. The lowest level of abstraction in :py:mod:`postgres` is
 a :py:mod:`psycopg2` `connection pool
@@ -100,10 +100,10 @@ of your code block, when the context manager commits the transaction for you::
 
     >>> with db.get_transaction() as txn:
     ...     txn.execute("INSERT INTO foo VALUES ('blam')")
-    ...     db.rows("SELECT * FROM foo ORDER BY bar")
+    ...     db.all("SELECT * FROM foo ORDER BY bar")
     ...
     [{'bar': 'baz'}, {'bar': 'buz'}]
-    >>> db.rows("SELECT * FROM foo ORDER BY bar")
+    >>> db.all("SELECT * FROM foo ORDER BY bar")
     [{'bar': 'baz'}, {'bar': 'blam'}, {'bar': 'buz'}]
 
 The :py:func:`~postgres.Postgres.get_transaction` manager gives you a cursor
@@ -237,7 +237,7 @@ class Postgres(object):
     :py:class:`NamedTupleCursor`.
 
     The names in our simple API, :py:meth:`~postgres.Postgres.run`,
-    :py:meth:`~postgres.Postgres.one`, and :py:meth:`~postgres.Postgres.rows`,
+    :py:meth:`~postgres.Postgres.one`, and :py:meth:`~postgres.Postgres.all`,
     were chosen to be short and memorable, and to not conflict with the DB-API
     2.0 :py:meth:`execute`, :py:meth:`fetchone`, and :py:meth:`fetchall`
     methods, which have slightly different semantics (under DB-API 2.0 you call
@@ -249,7 +249,7 @@ class Postgres(object):
     Note that when working inside a block under one of the context managers,
     you're using DB-API 2.0 (:py:meth:`execute` + :py:meth:`fetch*`), not our
     simple API (:py:meth:`~postgres.Postgres.run` /
-    :py:meth:`~postgres.Postgres.one` / :py:meth:`~postgres.Postgres.rows`).
+    :py:meth:`~postgres.Postgres.one` / :py:meth:`~postgres.Postgres.all`).
 
     .. _this ticket: https://github.com/gittip/postgres.py/issues/16
 
@@ -332,7 +332,7 @@ class Postgres(object):
 
             return cursor.fetchone()
 
-    def rows(self, sql, parameters=None):
+    def all(self, sql, parameters=None):
         """Execute a query and return all resulting rows.
 
         :param unicode sql: the SQL statement to execute
@@ -340,7 +340,7 @@ class Postgres(object):
         :type parameters: dict or tuple
         :returns: :py:class:`list` of rows
 
-        >>> for row in db.rows("SELECT bar FROM foo"):
+        >>> for row in db.all("SELECT bar FROM foo"):
         ...     print(row["bar"])
         ...
         baz
@@ -351,13 +351,21 @@ class Postgres(object):
             cursor.execute(sql, parameters)
             return cursor.fetchall()
 
+    def rows(self, *a, **kw):
+
+        # This is for backwards compatibility, see #16. It is stubbed instead
+        # of aliased to avoid showing up in our docs via sphinx autodoc.
+
+        return self.all(*a, **kw)
+
+
     def get_cursor(self, *a, **kw):
         """Return a :py:class:`~postgres.CursorContextManager` that uses our
         connection pool.
 
         This is what :py:meth:`~postgres.Postgres.run`,
         :py:meth:`~postgres.Postgres.one`, and
-        :py:meth:`~postgres.Postgres.rows` use under the hood. You might
+        :py:meth:`~postgres.Postgres.all` use under the hood. You might
         use it if you want to access `cursor attributes
         <http://initd.org/psycopg/docs/cursor.html>`_, for example.
 
