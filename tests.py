@@ -65,14 +65,14 @@ class TestNotOneException(WithData):
     def test_TooFew_message_is_helpful(self):
         try:
             self.db.one("SELECT * FROM foo WHERE bar='blah'", strict=True)
-        except TooFew, exc:
+        except TooFew as exc:
             actual = str(exc)
             assert actual == "Got 0 rows instead of 1."
 
     def test_TooMany_message_is_helpful(self):
         try:
             self.db.one("SELECT * FROM foo", strict=True)
-        except TooMany, exc:
+        except TooMany as exc:
             actual = str(exc)
             assert actual == "Got 2 rows instead of 1."
 
