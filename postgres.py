@@ -292,7 +292,7 @@ class Postgres(object):
         :type parameters: dict or tuple
         :param strict: whether to raise when there isn't exactly one result
         :type strict: :py:class:`bool`
-        :returns: :py:class:`dict` or :py:const:`None`
+        :returns: a single row or :py:const:`None`
         :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
 
         By default, :py:attr:`strict` ends up evaluating to :py:class:`True`,
@@ -334,7 +334,7 @@ class Postgres(object):
         :param unicode sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
         :type parameters: dict or tuple
-        :returns: :py:class:`list` of :py:class:`dict`
+        :returns: :py:class:`list` of rows
 
         >>> for row in db.rows("SELECT bar FROM foo"):
         ...     print(row["bar"])
@@ -351,9 +351,9 @@ class Postgres(object):
         """Return a :py:class:`~postgres.CursorContextManager` that uses our
         connection pool.
 
-        This is what :py:meth:`~postgres.Postgres.execute`,
-        :py:meth:`~postgres.Postgres.fetchone`, and
-        :py:meth:`~postgres.Postgres.fetchall` use under the hood. You might
+        This is what :py:meth:`~postgres.Postgres.run`,
+        :py:meth:`~postgres.Postgres.one`, and
+        :py:meth:`~postgres.Postgres.rows` use under the hood. You might
         use it if you want to access `cursor attributes
         <http://initd.org/psycopg/docs/cursor.html>`_, for example.
 
