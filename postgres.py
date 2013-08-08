@@ -8,6 +8,14 @@ Installation
 
     $ pip install postgres
 
+We `test <https://travis-ci.org/gittip/postgres.py>`_ against Python 2.6, 2.7,
+3.2, and 3.3. We don't yet have a testing matrix for different versions of
+:py:mod:`psycopg2` or PostgreSQL.
+
+Importing :py:mod:`postgres` under Python 2 will cause the registration of
+typecasters in psycopg2 to ensure that you get unicode instead of bytestrings
+for text data, according to `this advice`_.
+
 
 Tutorial
 --------
@@ -128,6 +136,7 @@ API
 .. _psycopg2: http://initd.org/psycopg/
 .. _GitHub: https://github.com/gittip/postgres
 .. _PyPI: https://pypi.python.org/pypi/postgres
+.. _this advice: http://initd.org/psycopg/docs/usage.html#unicode-handling
 .. _DB-API 2.0: http://www.python.org/dev/peps/pep-0249/
 .. _SQL injection: http://en.wikipedia.org/wiki/SQL_injection
 
@@ -136,20 +145,20 @@ from __future__ import unicode_literals
 
 try:                    # Python 2
     import urlparse
+
+    # "Note: In Python 2, if you want to uniformly receive all your database
+    # input in Unicode, you can register the related typecasters globally as
+    # soon as Psycopg is imported."
+    #   -- http://initd.org/psycopg/docs/usage.html#unicode-handling
+
+    import psycopg2.extensions
+    psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
+    psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
+
 except ImportError:     # Python 3
     import urllib.parse as urlparse
 
 import psycopg2
-
-# "Note: In Python 2, if you want to uniformly receive all your database input
-#  in Unicode, you can register the related typecasters globally as soon as
-#  Psycopg is imported."
-#   -- http://initd.org/psycopg/docs/usage.html#unicode-handling
-
-import psycopg2.extensions
-psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
-psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
-
 from psycopg2.extras import RealDictCursor
 from psycopg2.pool import ThreadedConnectionPool as ConnectionPool
 
@@ -224,10 +233,6 @@ class Postgres(object):
     managers, you're using DB-API 2.0 (:py:meth:`execute` + :py:meth:`fetch*`),
     not our simple API (:py:meth:`~postgres.Postgres.run` /
     :py:meth:`~postgres.Postgres.one` / :py:meth:`~postgres.Postgres.rows`).
-
-    Features:
-
-      - Get back unicode instead of bytestrings.
 
     >>> import postgres
     >>> db = postgres.Postgres("postgres://jrandom@localhost/test")
