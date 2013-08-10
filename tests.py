@@ -53,6 +53,25 @@ class TestRun(WithSchema):
         assert actual == 1
 
 
+# db.all
+# ======
+
+class TestRows(WithData):
+
+    def test_rows_fetches_all_rows(self):
+        actual = self.db.all("SELECT * FROM foo ORDER BY bar")
+        assert actual == [{"bar": "baz"}, {"bar": "buz"}]
+
+    def test_bind_parameters_as_dict_work(self):
+        params = {"bar": "baz"}
+        actual = self.db.all("SELECT * FROM foo WHERE bar=%(bar)s", params)
+        assert actual == [{"bar": "baz"}]
+
+    def test_bind_parameters_as_tuple_work(self):
+        actual = self.db.all("SELECT * FROM foo WHERE bar=%s", ("baz",))
+        assert actual == [{"bar": "baz"}]
+
+
 # db.one
 # ======
 # With all the combinations of strict_one and strict, we end up with a number
@@ -168,23 +187,27 @@ class TestOne_StrictOneTrue(TestOne):
         self.assertRaises(TooMany, self.db.one, "SELECT * FROM foo")
 
 
-# db.all
-# ======
+# db.one_or_zero
+# ==============
 
-class TestRows(WithData):
+class TestOneOrZero(WithData):
 
-    def test_rows_fetches_all_rows(self):
-        actual = self.db.all("SELECT * FROM foo ORDER BY bar")
-        assert actual == [{"bar": "baz"}, {"bar": "buz"}]
+    def test_one_or_zero_raises_TooFew(self):
+        self.assertRaises( TooFew
+                         , self.db.one_or_zero
+                         , "CREATE TABLE foux (baar text)"
+                          )
 
-    def test_bind_parameters_as_dict_work(self):
-        params = {"bar": "baz"}
-        actual = self.db.all("SELECT * FROM foo WHERE bar=%(bar)s", params)
-        assert actual == [{"bar": "baz"}]
+    def test_one_or_zero_returns_None(self):
+        actual = self.db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
+        assert actual is None
 
-    def test_bind_parameters_as_tuple_work(self):
-        actual = self.db.all("SELECT * FROM foo WHERE bar=%s", ("baz",))
-        assert actual == [{"bar": "baz"}]
+    def test_one_or_zero_returns_one(self):
+        actual = self.db.one_or_zero("SELECT * FROM foo WHERE bar='baz'")
+        assert actual == {"bar": "baz"}
+
+    def test_with_strict_True_one_raises_TooMany(self):
+        self.assertRaises(TooMany, self.db.one_or_zero, "SELECT * FROM foo")
 
 
 # db.get_cursor
