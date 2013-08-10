@@ -322,21 +322,15 @@ class Postgres(object):
             cursor.execute(sql, parameters)
             return cursor.fetchall()
 
-    def rows(self, *a, **kw):
 
-        # This is for backwards compatibility, see #16. It is stubbed instead
-        # of aliased to avoid showing up in our docs via sphinx autodoc.
-
-        return self.all(*a, **kw)
-
-
-    def one_or_zero(self, sql, parameters=None):
-        """Execute a query and return a single result or :py:class:`None`.
+    def one_or_zero(self, sql, parameters=None, zero=None):
+        """Execute a query and return a single result or a default value.
 
         :param unicode sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
         :type parameters: dict or tuple
-        :returns: a single row or :py:const:`None`
+        :returns: a single row or the value of the :py:attr:`zero` argument
+        :param zero: the value to return if zero results are found
         :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
 
         Use this for the common case where there should only be one record, but
@@ -349,64 +343,18 @@ class Postgres(object):
         No blam yet.
 
         """
-        return self._some(sql, parameters, 0, 1)
-
-
-    def one(self, sql, parameters=None, strict=None):
-
-        # I'm half-considering dropping this. Now that one_or_zero exists, this
-        # is really only useful for what should really be called db.first, and
-        # in that case why aren't you using a LIMIT 1?
-
-        """Execute a query and return a single result.
-
-        :param unicode sql: the SQL statement to execute
-        :param parameters: the bind parameters for the SQL statement
-        :type parameters: dict or tuple
-        :param strict: whether to raise when there isn't exactly one result
-        :type strict: :py:class:`bool`
-        :returns: a single row or :py:const:`None`
-        :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
-
-        By default, :py:attr:`strict` ends up evaluating to :py:class:`True`,
-        in which case we raise :py:exc:`postgres.TooFew` or
-        :py:exc:`postgres.TooMany` if the number of rows returned isn't exactly
-        one (both are subclasses of :py:exc:`postgres.OutOfBounds`). You can
-        override this behavior per-call with the :py:attr:`strict` argument
-        here, or globally by passing :py:attr:`strict_one` to the
-        :py:class:`~postgres.Postgres` constructor. If you use both, the
-        :py:attr:`strict` argument here wins. If you pass :py:class:`False`
-        for :py:attr:`strict`, then we return :py:class:`None` if there are no
-        results, and the first if there is more than one.
-
-        >>> row = db.one("SELECT * FROM foo WHERE bar='baz'")
-        >>> print(row["bar"])
-        baz
-
-        """
-        if strict not in (True, False, None):
-            raise ValueError("strict must be True, False, or None.")
-
-        if strict is None:
-            if self.strict_one is None:
-                strict = True               # library default
-            else:
-                strict = self.strict_one    # user default
-
-        if strict:
-            out = self._some(sql, parameters, 1, 1)
-        else:
-            with self.get_cursor() as cursor:
-                cursor.execute(sql, parameters)
-                out = cursor.fetchone()
+        out = self._some(sql, parameters, 0, 1)
+        if out is None:
+            out = zero
         return out
 
 
     def _some(self, sql, parameters=None, lo=0, hi=1):
 
         # This is undocumented (and largely untested) because I think it's a
-        # rare case where this is wanted directly. It's here to make one and
-        # one_or_zero DRY. Help yourself to it now that you've found it. :^)
+        # rare case where this is wanted directly. It was added to make one and
+        # one_or_zero DRY when we had one. Help yourself to it now that you've
+        # found it. :^)
 
         with self.get_transaction() as txn:
             txn.execute(sql, parameters)
