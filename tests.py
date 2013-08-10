@@ -6,6 +6,7 @@ from unittest import TestCase
 
 from postgres import Postgres, TooFew, TooMany
 from psycopg2.extras import NamedTupleCursor
+from psycopg2 import InterfaceError
 
 
 DATABASE_URL = os.environ['DATABASE_URL']
@@ -233,6 +234,13 @@ class TestCursor(WithData):
             actual = cursor.closed
         assert not actual
 
+    def test_we_close_the_cursor(self):
+        with self.db.get_cursor() as cursor:
+            cursor.execute("SELECT * FROM foo ORDER BY bar")
+        self.assertRaises( InterfaceError
+                         , cursor.fetchall
+                          )
+
 
 # db.get_transaction
 # ==================
@@ -271,6 +279,13 @@ class TestTransaction(WithData):
             pass
         actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
+
+    def test_we_close_the_cursor(self):
+        with self.db.get_transaction() as txn:
+            txn.execute("SELECT * FROM foo ORDER BY bar")
+        self.assertRaises( InterfaceError
+                         , txn.fetchall
+                          )
 
 
 # db.get_connection

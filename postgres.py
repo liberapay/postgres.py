@@ -505,11 +505,13 @@ class CursorContextManager(object):
         """Get a connection from the pool.
         """
         self.conn = self.pool.getconn()
-        return self.conn.cursor(*self.a, **self.kw)
+        self.cursor = self.conn.cursor(*self.a, **self.kw)
+        return self.cursor
 
     def __exit__(self, *exc_info):
         """Put our connection back in the pool.
         """
+        self.cursor.close()
         self.pool.putconn(self.conn)
 
 
@@ -540,7 +542,8 @@ class TransactionContextManager(object):
         """
         self.conn = self.pool.getconn()
         self.conn.autocommit = False
-        return self.conn.cursor(*self.a, **self.kw)
+        self.cursor = self.conn.cursor(*self.a, **self.kw)
+        return self.cursor
 
     def __exit__(self, *exc_info):
         """Put our connection back in the pool.
@@ -549,6 +552,7 @@ class TransactionContextManager(object):
             self.conn.commit()
         else:
             self.conn.rollback()
+        self.cursor.close()
         self.conn.autocommit = True
         self.pool.putconn(self.conn)
 
