@@ -34,15 +34,12 @@ Use :py:meth:`~postgres.Postgres.all` to fetch all results:
     >>> db.all("SELECT * FROM foo ORDER BY bar")
     [{'bar': 'baz'}, {'bar': 'buz'}]
 
-Use :py:meth:`~postgres.Postgres.one` to fetch exactly one result:
-
-    >>> db.one("SELECT * FROM foo WHERE bar='baz'")
-    {'bar': 'baz'}
-
 Use :py:meth:`~postgres.Postgres.one_or_zero` to fetch one result or
 :py:class:`None`:
 
-    >>> db.one("SELECT * FROM foo WHERE bar='blam'")
+    >>> db.one_or_zero("SELECT * FROM foo WHERE bar='baz'")
+    {'bar': 'baz'}
+    >>> db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
 
 
 Bind Parameters
@@ -67,11 +64,11 @@ Context Managers
 ++++++++++++++++
 
 Eighty percent of your database usage should be covered by the simple
-:py:meth:`~postgres.Postgres.run`, :py:meth:`~postgres.Postgres.one`,
-:py:meth:`~postgres.Postgres.all` API introduced above. For the other 20%,
-:py:mod:`postgres` provides context managers for working at increasingly lower
-levels of abstraction. The lowest level of abstraction in :py:mod:`postgres` is
-a :py:mod:`psycopg2` `connection pool
+:py:meth:`~postgres.Postgres.run`, :py:meth:`~postgres.Postgres.all`,
+:py:meth:`~postgres.Postgres.one_or_zero` API introduced above. For the other
+20%, :py:mod:`postgres` provides context managers for working at increasingly
+lower levels of abstraction. The lowest level of abstraction in
+:py:mod:`postgres` is a :py:mod:`psycopg2` `connection pool
 <http://initd.org/psycopg/docs/pool.html>`_ that we configure and manage for
 you. Everything in :py:mod:`postgres`, both the simple API and the context
 managers, uses this connection pool.
@@ -252,19 +249,20 @@ class Postgres(object):
     :py:class:`NamedTupleCursor`.
 
     The names in our simple API, :py:meth:`~postgres.Postgres.run`,
-    :py:meth:`~postgres.Postgres.one`, and :py:meth:`~postgres.Postgres.all`,
-    were chosen to be short and memorable, and to not conflict with the DB-API
-    2.0 :py:meth:`execute`, :py:meth:`fetchone`, and :py:meth:`fetchall`
-    methods, which have slightly different semantics (under DB-API 2.0 you call
-    :py:meth:`execute` on a cursor and then call one of the :py:meth:`fetch*`
-    methods on the same cursor to retrieve rows; with our simple API there is
-    no second :py:meth:`fetch` step). See `this ticket`_ for more of the
-    rationale behind these names. The context managers on this class are named
-    starting with :py:meth:`get_` to set them apart from the simple-case API.
-    Note that when working inside a block under one of the context managers,
-    you're using DB-API 2.0 (:py:meth:`execute` + :py:meth:`fetch*`), not our
-    simple API (:py:meth:`~postgres.Postgres.run` /
-    :py:meth:`~postgres.Postgres.one` / :py:meth:`~postgres.Postgres.all`).
+    :py:meth:`~postgres.Postgres.all`, and
+    :py:meth:`~postgres.Postgres.one_or_zero`, were chosen to be short and
+    memorable, and to not conflict with the DB-API 2.0 :py:meth:`execute`,
+    :py:meth:`fetchone`, and :py:meth:`fetchall` methods, which have slightly
+    different semantics (under DB-API 2.0 you call :py:meth:`execute` on a
+    cursor and then call one of the :py:meth:`fetch*` methods on the same
+    cursor to retrieve rows; with our simple API there is no second
+    :py:meth:`fetch` step). See `this ticket`_ for more of the rationale behind
+    these names. The context managers on this class are named starting with
+    :py:meth:`get_` to set them apart from the simple-case API.  Note that when
+    working inside a block under one of the context managers, you're using
+    DB-API 2.0 (:py:meth:`execute` + :py:meth:`fetch*`), not our simple API
+    (:py:meth:`~postgres.Postgres.run` / :py:meth:`~postgres.Postgres.one` /
+    :py:meth:`~postgres.Postgres.all`).
 
     .. _this ticket: https://github.com/gittip/postgres.py/issues/16
 
@@ -332,6 +330,28 @@ class Postgres(object):
         return self.all(*a, **kw)
 
 
+    def one_or_zero(self, sql, parameters=None):
+        """Execute a query and return a single result or :py:class:`None`.
+
+        :param unicode sql: the SQL statement to execute
+        :param parameters: the bind parameters for the SQL statement
+        :type parameters: dict or tuple
+        :returns: a single row or :py:const:`None`
+        :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
+
+        Use this for the common case where there should only be one record, but
+        it may not exist yet.
+
+        >>> row = db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
+        >>> if row is None:
+        ...     print("No blam yet.")
+        ...
+        No blam yet.
+
+        """
+        return self._some(sql, parameters, 0, 1)
+
+
     def one(self, sql, parameters=None, strict=None):
         """Execute a query and return a single result.
 
@@ -377,28 +397,6 @@ class Postgres(object):
         return out
 
 
-    def one_or_zero(self, sql, parameters=None):
-        """Execute a query and return a single result or :py:class:`None`.
-
-        :param unicode sql: the SQL statement to execute
-        :param parameters: the bind parameters for the SQL statement
-        :type parameters: dict or tuple
-        :returns: a single row or :py:const:`None`
-        :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
-
-        Use this for the common case where there should only be one record, but
-        it may not exist yet.
-
-        >>> row = db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
-        >>> if row is None:
-        ...     print("No blam yet.")
-        ...
-        No blam yet.
-
-        """
-        return self._some(sql, parameters, 0, 1)
-
-
     def _some(self, sql, parameters=None, lo=0, hi=1):
 
         # This is undocumented (and largely untested) because I think it's a
@@ -420,11 +418,10 @@ class Postgres(object):
         """Return a :py:class:`~postgres.CursorContextManager` that uses our
         connection pool.
 
-        This is what :py:meth:`~postgres.Postgres.run`,
-        :py:meth:`~postgres.Postgres.one`, and
-        :py:meth:`~postgres.Postgres.all` use under the hood. You might
-        use it if you want to access `cursor attributes
-        <http://initd.org/psycopg/docs/cursor.html>`_, for example.
+        This gets you a cursor with :py:attr:`autocommit` turned on on its
+        connection. The context manager closes the cursor when the block ends.
+
+        Use this when you want a simple cursor.
 
         >>> with db.get_cursor() as cursor:
         ...     cursor.execute("SELECT * FROM foo")
@@ -439,11 +436,15 @@ class Postgres(object):
         """Return a :py:class:`~postgres.TransactionContextManager` that uses
         our connection pool.
 
+        This gets you a cursor with :py:attr:`autocommit` turned off on its
+        connection. If your code block inside the :py:obj:`with` statement
+        raises an exception, the transaction will be rolled back. Otherwise,
+        it'll be committed. The context manager closes the cursor when the
+        block ends.
+
         Use this when you want a series of statements to be part of one
         transaction, but you don't need fine-grained control over the
-        transaction. If your code block inside the :py:obj:`with` statement
-        raises an exception, the transaction will be rolled back. Otherwise,
-        it'll be committed.
+        transaction.
 
         >>> with db.get_transaction() as txn:
         ...     txn.execute("SELECT * FROM foo")
@@ -509,7 +510,7 @@ class CursorContextManager(object):
     arguments to our constructor are passed through to the cursor constructor.
     The :py:class:`~postgres.Connection` underlying the cursor is checked
     out of the connection pool when the block starts, and checked back in when
-    the block ends.
+    the block ends. Also when the block ends, the cursor is closed.
 
     """
 
@@ -544,8 +545,9 @@ class TransactionContextManager(object):
     cursor is checked out of the connection pool and :py:attr:`autocommit` is
     set to :py:const:`False`. If the block raises an exception, the
     :py:class:`~postgres.Connection` is rolled back. Otherwise it's committed.
-    In either case, :py:attr:`autocommit` is restored to :py:const:`True` and
-    the :py:class:`~postgres.Connection` is put back in the pool.
+    In either case, the cursor is closed, :py:attr:`autocommit` is restored to
+    :py:const:`True`, and the :py:class:`~postgres.Connection` is put back in
+    the pool.
 
     """
 
