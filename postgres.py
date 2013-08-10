@@ -405,7 +405,7 @@ class Postgres(object):
         # rare case where this is wanted directly. It's here to make one and
         # one_or_zero DRY. Help yourself to it now that you've found it. :^)
 
-        with self.get_cursor() as txn:
+        with self.get_transaction() as txn:
             txn.execute(sql, parameters)
 
             if txn.rowcount < lo:
