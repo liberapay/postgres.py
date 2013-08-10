@@ -29,13 +29,13 @@ Use :py:meth:`~postgres.Postgres.run` to run SQL statements:
     >>> db.run("INSERT INTO foo VALUES ('baz')")
     >>> db.run("INSERT INTO foo VALUES ('buz')")
 
-Use :py:meth:`~postgres.Postgres.all` to fetch all results:
+Use :py:meth:`~postgres.Postgres.all` to run SQL and fetch all results:
 
     >>> db.all("SELECT * FROM foo ORDER BY bar")
     [{'bar': 'baz'}, {'bar': 'buz'}]
 
-Use :py:meth:`~postgres.Postgres.one_or_zero` to fetch one result or
-:py:class:`None`:
+Use :py:meth:`~postgres.Postgres.one_or_zero` to run SQL and fetch one result
+or :py:class:`None`:
 
     >>> db.one_or_zero("SELECT * FROM foo WHERE bar='baz'")
     {'bar': 'baz'}
