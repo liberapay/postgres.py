@@ -29,16 +29,20 @@ Use :py:meth:`~postgres.Postgres.run` to run SQL statements:
     >>> db.run("INSERT INTO foo VALUES ('baz')")
     >>> db.run("INSERT INTO foo VALUES ('buz')")
 
+Use :py:meth:`~postgres.Postgres.all` to fetch all results:
+
+    >>> db.all("SELECT * FROM foo ORDER BY bar")
+    [{'bar': 'baz'}, {'bar': 'buz'}]
+
 Use :py:meth:`~postgres.Postgres.one` to fetch exactly one result:
 
     >>> db.one("SELECT * FROM foo WHERE bar='baz'")
     {'bar': 'baz'}
 
+Use :py:meth:`~postgres.Postgres.one_or_zero` to fetch one result or
+:py:class:`None`:
 
-Use :py:meth:`~postgres.Postgres.all` to fetch all results:
-
-    >>> db.all("SELECT * FROM foo ORDER BY bar")
-    [{'bar': 'baz'}, {'bar': 'buz'}]
+    >>> db.one("SELECT * FROM foo WHERE bar='blam'")
 
 
 Bind Parameters
@@ -272,6 +276,7 @@ class Postgres(object):
             raise ValueError("strict_one must be True, False, or None.")
         self.strict_one = strict_one
 
+
     def run(self, sql, parameters=None):
         """Execute a query and discard any results.
 
@@ -287,6 +292,34 @@ class Postgres(object):
         """
         with self.get_cursor() as cursor:
             cursor.execute(sql, parameters)
+
+
+    def all(self, sql, parameters=None):
+        """Execute a query and return all results.
+
+        :param unicode sql: the SQL statement to execute
+        :param parameters: the bind parameters for the SQL statement
+        :type parameters: dict or tuple
+        :returns: :py:class:`list` of rows
+
+        >>> for row in db.all("SELECT bar FROM foo"):
+        ...     print(row["bar"])
+        ...
+        baz
+        buz
+
+        """
+        with self.get_cursor() as cursor:
+            cursor.execute(sql, parameters)
+            return cursor.fetchall()
+
+    def rows(self, *a, **kw):
+
+        # This is for backwards compatibility, see #16. It is stubbed instead
+        # of aliased to avoid showing up in our docs via sphinx autodoc.
+
+        return self.all(*a, **kw)
+
 
     def one(self, sql, parameters=None, strict=None):
         """Execute a query and return a single result.
@@ -335,31 +368,34 @@ class Postgres(object):
 
             return cursor.fetchone()
 
-    def all(self, sql, parameters=None):
-        """Execute a query and return all results.
+    def one_or_zero(self, sql, parameters=None):
+        """Execute a query and return a single result or :py:class:`None`.
 
         :param unicode sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
         :type parameters: dict or tuple
-        :returns: :py:class:`list` of rows
+        :returns: a single row or :py:const:`None`
+        :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
 
-        >>> for row in db.all("SELECT bar FROM foo"):
-        ...     print(row["bar"])
+        Use this for the common case where there should only be one record, but
+        it may not exist yet.
+
+        >>> row = db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
+        >>> if row is None:
+        ...     print("No blam yet.")
         ...
-        baz
-        buz
+        No blam yet.
 
         """
         with self.get_cursor() as cursor:
             cursor.execute(sql, parameters)
-            return cursor.fetchall()
 
-    def rows(self, *a, **kw):
+            if cursor.rowcount < 0:
+                raise TooFew(cursor.rowcount)
+            elif cursor.rowcount > 1:
+                raise TooMany(cursor.rowcount)
 
-        # This is for backwards compatibility, see #16. It is stubbed instead
-        # of aliased to avoid showing up in our docs via sphinx autodoc.
-
-        return self.all(*a, **kw)
+            return cursor.fetchone()
 
 
     def get_cursor(self, *a, **kw):
