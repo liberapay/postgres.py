@@ -353,6 +353,11 @@ class Postgres(object):
 
 
     def one(self, sql, parameters=None, strict=None):
+
+        # I'm half-considering dropping this. Now that one_or_zero exists, this
+        # is really only useful for what should really be called db.first, and
+        # in that case why aren't you using a LIMIT 1?
+
         """Execute a query and return a single result.
 
         :param unicode sql: the SQL statement to execute
