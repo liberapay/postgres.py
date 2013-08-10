@@ -109,6 +109,17 @@ class TestWrongNumberException(WithData):
                            "Got 4 rows; expecting between 1 and 3 (inclusive)."
 
 
+class TestOneRollsBack(WithData):
+
+    def test_one_rollsback_on_error(self):
+        try:
+            self.db.one("UPDATE foo SET bar='bum' RETURNING *", strict=True)
+        except TooMany:
+            pass
+        actual = self.db.all("SELECT * FROM foo WHERE bar='bum'")
+        assert actual == []
+
+
 class TestOne(WithData):
 
     def test_with_strict_True_one_raises_TooFew(self):
@@ -207,6 +218,16 @@ class TestOneOrZero(WithData):
         self.assertRaises( TooFew
                          , self.db.one_or_zero
                          , "CREATE TABLE foux (baar text)"
+                          )
+
+    def test_one_or_zero_rollsback_on_error(self):
+        try:
+            self.db.one_or_zero("CREATE TABLE foux (baar text)")
+        except TooFew:
+            pass
+        self.assertRaises( ProgrammingError
+                         , self.db.all
+                         , "SELECT * FROM foux"
                           )
 
     def test_one_or_zero_returns_None(self):
