@@ -350,9 +350,3 @@ class TestCursorFactory(WithData):
         expected = [Record(bar="baz"), Record(bar="buz")]
         actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == expected
-
-    def test_NamedDictCursor_results_in_namedtuples(self):
-        Record = namedtuple("Record", ["bar"])
-        expected = [Record(bar="baz"), Record(bar="buz")]
-        actual = self.db.all("SELECT * FROM foo ORDER BY bar")
-        assert actual == expected
