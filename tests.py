@@ -82,7 +82,7 @@ class TestRows(WithData):
 # class for other TestCases that vary the strict_one attribute. The TestOne
 # tests will be re-run in each new context.
 
-class TestNotOneException(WithData):
+class TestWrongNumberException(WithData):
 
     def test_TooFew_message_is_helpful(self):
         try:
