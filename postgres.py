@@ -194,14 +194,25 @@ def url_to_dsn(url):
 # Exceptions
 # ==========
 
-class NotOne(Exception):
-    def __init__(self, rowcount):
-        self.rowcount = rowcount
-    def __str__(self):
-        return "Got {0} rows instead of 1.".format(self.rowcount)
+class OutOfBounds(Exception):
 
-class TooFew(NotOne): pass
-class TooMany(NotOne): pass
+    def __init__(self, n, lo, hi):
+        self.n = n
+        self.lo = lo
+        self.hi = hi
+
+    def __str__(self):
+        msg = "Got {n} rows; expecting "
+        if self.lo == self.hi:
+            msg += "exactly {lo}."
+        elif self.hi - self.lo == 1:
+            msg += "{lo} or {hi}."
+        else:
+            msg += "between {lo} and {hi} (inclusive)."
+        return msg.format(**self.__dict__)
+
+class TooFew(OutOfBounds): pass
+class TooMany(OutOfBounds): pass
 
 
 # The Main Event
@@ -335,7 +346,7 @@ class Postgres(object):
         By default, :py:attr:`strict` ends up evaluating to :py:class:`True`,
         in which case we raise :py:exc:`postgres.TooFew` or
         :py:exc:`postgres.TooMany` if the number of rows returned isn't exactly
-        one (both are subclasses of :py:exc:`postgres.NotOne`). You can
+        one (both are subclasses of :py:exc:`postgres.OutOfBounds`). You can
         override this behavior per-call with the :py:attr:`strict` argument
         here, or globally by passing :py:attr:`strict_one` to the
         :py:class:`~postgres.Postgres` constructor. If you use both, the
@@ -357,16 +368,14 @@ class Postgres(object):
             else:
                 strict = self.strict_one    # user default
 
-        with self.get_cursor() as cursor:
-            cursor.execute(sql, parameters)
+        if strict:
+            out = self._some(sql, parameters, 1, 1)
+        else:
+            with self.get_cursor() as cursor:
+                cursor.execute(sql, parameters)
+                out = cursor.fetchone()
+        return out
 
-            if strict:
-                if cursor.rowcount < 1:
-                    raise TooFew(cursor.rowcount)
-                elif cursor.rowcount > 1:
-                    raise TooMany(cursor.rowcount)
-
-            return cursor.fetchone()
 
     def one_or_zero(self, sql, parameters=None):
         """Execute a query and return a single result or :py:class:`None`.
@@ -387,15 +396,24 @@ class Postgres(object):
         No blam yet.
 
         """
-        with self.get_cursor() as cursor:
-            cursor.execute(sql, parameters)
+        return self._some(sql, parameters, 0, 1)
 
-            if cursor.rowcount < 0:
-                raise TooFew(cursor.rowcount)
-            elif cursor.rowcount > 1:
-                raise TooMany(cursor.rowcount)
 
-            return cursor.fetchone()
+    def _some(self, sql, parameters=None, lo=0, hi=1):
+
+        # This is undocumented (and largely untested) because I think it's a
+        # rare case where this is wanted directly. It's here to make one and
+        # one_or_zero DRY. Help yourself to it now that you've found it. :^)
+
+        with self.get_cursor() as txn:
+            txn.execute(sql, parameters)
+
+            if txn.rowcount < lo:
+                raise TooFew(txn.rowcount, lo, hi)
+            elif txn.rowcount > hi:
+                raise TooMany(txn.rowcount, lo, hi)
+
+            return txn.fetchone()
 
 
     def get_cursor(self, *a, **kw):

@@ -6,7 +6,7 @@ from unittest import TestCase
 
 from postgres import Postgres, TooFew, TooMany
 from psycopg2.extras import NamedTupleCursor
-from psycopg2 import InterfaceError
+from psycopg2 import InterfaceError, ProgrammingError
 
 
 DATABASE_URL = os.environ['DATABASE_URL']
@@ -89,14 +89,24 @@ class TestWrongNumberException(WithData):
             self.db.one("SELECT * FROM foo WHERE bar='blah'", strict=True)
         except TooFew as exc:
             actual = str(exc)
-            assert actual == "Got 0 rows instead of 1."
+            assert actual == "Got 0 rows; expecting exactly 1."
 
-    def test_TooMany_message_is_helpful(self):
+    def test_TooMany_message_is_helpful_for_two_options(self):
         try:
-            self.db.one("SELECT * FROM foo", strict=True)
+            self.db.one_or_zero("SELECT * FROM foo")
         except TooMany as exc:
             actual = str(exc)
-            assert actual == "Got 2 rows instead of 1."
+            assert actual == "Got 2 rows; expecting 0 or 1."
+
+    def test_TooMany_message_is_helpful_for_a_range(self):
+        self.db.run("INSERT INTO foo VALUES ('blam')")
+        self.db.run("INSERT INTO foo VALUES ('blim')")
+        try:
+            self.db._some("SELECT * FROM foo", lo=1, hi=3)
+        except TooMany as exc:
+            actual = str(exc)
+            assert actual == \
+                           "Got 4 rows; expecting between 1 and 3 (inclusive)."
 
 
 class TestOne(WithData):
