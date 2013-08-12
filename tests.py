@@ -50,7 +50,7 @@ class TestRun(WithSchema):
     def test_run_inserts(self):
         self.db.run("CREATE TABLE foo (bar text)")
         self.db.run("INSERT INTO foo VALUES ('baz')")
-        actual = len(self.db.one("SELECT * FROM foo ORDER BY bar"))
+        actual = len(self.db.one_or_zero("SELECT * FROM foo ORDER BY bar"))
         assert actual == 1
 
 
@@ -63,6 +63,14 @@ class TestRows(WithData):
         actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
 
+    def test_rows_fetches_one_row(self):
+        actual = self.db.all("SELECT * FROM foo WHERE bar='baz'")
+        assert actual == [{"bar": "baz"}]
+
+    def test_rows_fetches_no_rows(self):
+        actual = self.db.all("SELECT * FROM foo WHERE bar='blam'")
+        assert actual == []
+
     def test_bind_parameters_as_dict_work(self):
         params = {"bar": "baz"}
         actual = self.db.all("SELECT * FROM foo WHERE bar=%(bar)s", params)
@@ -73,44 +81,37 @@ class TestRows(WithData):
         assert actual == [{"bar": "baz"}]
 
 
-# db.one
-# ======
-# With all the combinations of strict_one and strict, we end up with a number
-# of tests here. Since the behavior of the one method with a strict parameter
-# of True or False is expected to be the same regardless of what strict_one is
-# set to, we can write those once and then use the TestOne TestCase as the base
-# class for other TestCases that vary the strict_one attribute. The TestOne
-# tests will be re-run in each new context.
+# db.one_or_zero
+# ==============
 
 class TestWrongNumberException(WithData):
 
     def test_TooFew_message_is_helpful(self):
         try:
-            self.db.one("SELECT * FROM foo WHERE bar='blah'", strict=True)
+            exc = self.db.one_or_zero("CREATE TABLE foux (baar text)")
         except TooFew as exc:
-            actual = str(exc)
-            assert actual == "Got 0 rows; expecting exactly 1."
+            pass
+        actual = str(exc)
+        assert actual == "Got -1 rows; expecting 0 or 1."
 
     def test_TooMany_message_is_helpful_for_two_options(self):
         try:
-            self.db.one_or_zero("SELECT * FROM foo")
+            exc = self.db._some("SELECT * FROM foo", lo=1, hi=1)
         except TooMany as exc:
-            actual = str(exc)
-            assert actual == "Got 2 rows; expecting 0 or 1."
+            pass
+        actual = str(exc)
+        assert actual == "Got 2 rows; expecting exactly 1."
 
     def test_TooMany_message_is_helpful_for_a_range(self):
         self.db.run("INSERT INTO foo VALUES ('blam')")
         self.db.run("INSERT INTO foo VALUES ('blim')")
         try:
-            self.db._some("SELECT * FROM foo", lo=1, hi=3)
+            exc = self.db._some("SELECT * FROM foo", lo=1, hi=3)
         except TooMany as exc:
-            actual = str(exc)
-            assert actual == \
-                           "Got 4 rows; expecting between 1 and 3 (inclusive)."
+            pass
+        actual = str(exc)
+        assert actual == "Got 4 rows; expecting between 1 and 3 (inclusive)."
 
-
-# db.one_or_zero
-# ==============
 
 class TestOneOrZero(WithData):
 
@@ -147,37 +148,6 @@ class TestOneOrZero(WithData):
 
     def test_with_strict_True_one_raises_TooMany(self):
         self.assertRaises(TooMany, self.db.one_or_zero, "SELECT * FROM foo")
-
-
-# db.get_cursor
-# =============
-
-class TestCursor(WithData):
-
-    def test_get_cursor_gets_a_cursor(self):
-        with self.db.get_cursor() as cursor:
-            cursor.execute("SELECT * FROM foo ORDER BY bar")
-            actual = cursor.fetchall()
-        assert actual == [{"bar": "baz"}, {"bar": "buz"}]
-
-    def test_we_can_use_cursor_rowcount(self):
-        with self.db.get_cursor() as cursor:
-            cursor.execute("SELECT * FROM foo ORDER BY bar")
-            actual = cursor.rowcount
-        assert actual == 2
-
-    def test_we_can_use_cursor_closed(self):
-        with self.db.get_cursor() as cursor:
-            cursor.execute("SELECT * FROM foo ORDER BY bar")
-            actual = cursor.closed
-        assert not actual
-
-    def test_we_close_the_cursor(self):
-        with self.db.get_cursor() as cursor:
-            cursor.execute("SELECT * FROM foo ORDER BY bar")
-        self.assertRaises( InterfaceError
-                         , cursor.fetchall
-                          )
 
 
 # db.get_transaction
