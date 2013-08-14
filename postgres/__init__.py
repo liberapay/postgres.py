@@ -472,9 +472,10 @@ class Postgres(object):
 
         n = self.one_or_zero( "SELECT count(*) FROM pg_type WHERE typname=%s"
                             , (ModelSubclass.typname,)
-                             )[0]
+                             )
         if n < 1:
             # Could be more than one since we don't constrain by typnamespace.
+            # XXX What happens then?
             raise NoSuchType(ModelSubclass.typname)
 
         if ModelSubclass.typname in self.model_registry:
