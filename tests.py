@@ -5,7 +5,7 @@ from collections import namedtuple
 from unittest import TestCase
 
 from postgres import Postgres, TooFew, TooMany
-from psycopg2.extras import NamedTupleCursor
+from psycopg2.extras import RealDictCursor
 from psycopg2 import InterfaceError, ProgrammingError
 
 
@@ -18,7 +18,7 @@ DATABASE_URL = os.environ['DATABASE_URL']
 class WithSchema(TestCase):
 
     def setUp(self):
-        self.db = Postgres(DATABASE_URL)
+        self.db = Postgres(DATABASE_URL, cursor_factory=RealDictCursor)
         self.db.run("DROP SCHEMA IF EXISTS public CASCADE")
         self.db.run("CREATE SCHEMA public")
 
@@ -215,7 +215,7 @@ class TestConnection(WithData):
 class TestCursorFactory(WithData):
 
     def setUp(self):                    # override
-        self.db = Postgres(DATABASE_URL, cursor_factory=NamedTupleCursor)
+        self.db = Postgres(DATABASE_URL)
         self.db.run("DROP SCHEMA IF EXISTS public CASCADE")
         self.db.run("CREATE SCHEMA public")
         self.db.run("CREATE TABLE foo (bar text)")
