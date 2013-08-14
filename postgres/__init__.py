@@ -21,25 +21,31 @@ Tutorial
 Instantiate a :py:class:`Postgres` object when your application starts:
 
     >>> from postgres import Postgres
-    >>> db = Postgres("postgres://jrandom@localhost/testdb")
+    >>> db = Postgres("postgres://jrandom@localhost/test")
 
 Use :py:meth:`~postgres.Postgres.run` to run SQL statements:
 
-    >>> db.run("CREATE TABLE foo (bar text)")
-    >>> db.run("INSERT INTO foo VALUES ('baz')")
-    >>> db.run("INSERT INTO foo VALUES ('buz')")
+    >>> db.run("CREATE TABLE foo (bar text, baz int)")
+    >>> db.run("INSERT INTO foo VALUES ('buz', 42)")
+    >>> db.run("INSERT INTO foo VALUES ('bit', 537)")
 
 Use :py:meth:`~postgres.Postgres.all` to run SQL and fetch all results:
 
     >>> db.all("SELECT * FROM foo ORDER BY bar")
-    [{'bar': 'baz'}, {'bar': 'buz'}]
+    [Record(bar=u'bit', baz=537), Record(bar=u'buz', baz=42)]
 
 Use :py:meth:`~postgres.Postgres.one_or_zero` to run SQL and fetch one result
 or :py:class:`None`:
 
-    >>> db.one_or_zero("SELECT * FROM foo WHERE bar='baz'")
-    {'bar': 'baz'}
+    >>> db.one_or_zero("SELECT * FROM foo WHERE bar='buz'")
+    Record(bar=u'buz', baz=42)
     >>> db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
+
+If your query returns one column then you get a list of values instead of
+Records:
+
+    >>> db.all("SELECT baz FROM foo ORDER BY bar")
+    [537, 42]
 
 
 Bind Parameters
@@ -52,8 +58,8 @@ an implementation of DB-API 2.0) will bind to the query in a way that is safe
 against `SQL injection`_. (This is inspired by old-style Python string
 formatting, but it is not the same.)
 
-    >>> db.one("SELECT * FROM foo WHERE bar=%(bar)s", {"bar": "baz"})
-    {'bar': 'baz'}
+    >>> db.one_or_zero("SELECT * FROM foo WHERE bar=%(bar)s", {"bar": "buz"})
+    Record(bar=u'buz', baz=42)
 
 Never build SQL strings out of user input!
 
@@ -83,18 +89,19 @@ connection pooling and automatic transaction management:
     ...     txn.execute("SELECT * FROM foo ORDER BY bar")
     ...     txn.fetchall()
     ...
-    [{'bar': 'baz'}, {'bar': 'blam'}, {'bar': 'buz'}]
+    [Record(bar=u'bit', baz=537), Record(bar=u'blam', baz=None), Record(bar=u'buz', baz=42)]
 
 Note that other calls won't see the changes on your transaction until the end
 of your code block, when the context manager commits the transaction for you::
 
+    >>> db.run("DELETE FROM foo WHERE bar='blam'")
     >>> with db.get_transaction() as txn:
     ...     txn.execute("INSERT INTO foo VALUES ('blam')")
     ...     db.all("SELECT * FROM foo ORDER BY bar")
     ...
-    [{'bar': 'baz'}, {'bar': 'buz'}]
+    [Record(bar=u'bit', baz=537), Record(bar=u'buz', baz=42)]
     >>> db.all("SELECT * FROM foo ORDER BY bar")
-    [{'bar': 'baz'}, {'bar': 'blam'}, {'bar': 'buz'}]
+    [Record(bar=u'bit', baz=537), Record(bar=u'blam', baz=None), Record(bar=u'buz', baz=42)]
 
 The :py:func:`~postgres.Postgres.get_transaction` manager gives you a cursor
 with :py:attr:`autocommit` turned off on its connection. If the block under
@@ -104,12 +111,13 @@ transaction, but you don't need fine-grained control over the transaction. For
 fine-grained control, use :py:func:`~postgres.Postgres.get_connection` to get a
 connection straight from the connection pool:
 
+    >>> db.run("DELETE FROM foo WHERE bar='blam'")
     >>> with db.get_connection() as connection:
     ...     cursor = connection.cursor()
     ...     cursor.execute("SELECT * FROM foo ORDER BY bar")
     ...     cursor.fetchall()
     ...
-    [{'bar': 'baz'}, {'bar': 'buz'}]
+    [Record(bar=u'bit', baz=537), Record(bar=u'buz', baz=42)]
 
 A connection gotten in this way will have :py:attr:`autocommit` turned off, and
 it'll never be implicitly committed otherwise. It'll actually be rolled back
@@ -118,8 +126,8 @@ This is the lowest-level abstraction that :py:mod:`postgres` provides,
 basically just a pre-configured connection pool from :py:mod:`psycopg2`.
 
 
-API
----
+The Postgres Object
+-------------------
 
 .. _psycopg2: http://initd.org/psycopg/
 .. _GitHub: https://github.com/gittip/postgres
@@ -130,7 +138,7 @@ API
 .. _SQL injection: http://en.wikipedia.org/wiki/SQL_injection
 
 """
-from __future__ import unicode_literals
+from __future__ import print_function, unicode_literals
 
 try:                    # Python 2
     import urlparse
@@ -148,7 +156,10 @@ except ImportError:     # Python 3
     import urllib.parse as urlparse
 
 import psycopg2
-from psycopg2.extras import RealDictCursor
+from postgres.orm import Model
+from psycopg2.extensions import cursor as RegularCursor
+from psycopg2.extras import register_composite, CompositeCaster
+from psycopg2.extras import NamedTupleCursor
 from psycopg2.pool import ThreadedConnectionPool as ConnectionPool
 
 
@@ -200,6 +211,27 @@ class OutOfBounds(Exception):
 class TooFew(OutOfBounds): pass
 class TooMany(OutOfBounds): pass
 
+class NotAModel(Exception):
+    def __str__(self):
+        return "Only subclasses of postgres.orm.Model can be registered as " \
+               "orm models. {} (registered for {}) doesn't fit the bill." \
+               .format(self.args[0].__name__, self.args[1])
+
+class NoSuchType(Exception):
+    def __str__(self):
+        return "You tried to register an orm Model for typname {}, but no "\
+               "such type exists in the pg_type table of your database." \
+               .format(self.args[0])
+
+class AlreadyRegistered(Exception):
+    def __str__(self):
+        return "The Model {} is already registered for the typname {}." \
+               .format(self.args[0].__name__, self.args[1])
+
+class NotRegistered(Exception):
+    def __str__(self):
+        return "The Model {} is not registered.".format(self.args[0].__name__)
+
 
 # The Main Event
 # ==============
@@ -207,10 +239,13 @@ class TooMany(OutOfBounds): pass
 class Postgres(object):
     """Interact with a `PostgreSQL <http://www.postgresql.org/>`_ database.
 
-    :param unicode url: A ``postgres://`` URL or a `PostgreSQL connection string <http://www.postgresql.org/docs/current/static/libpq-connect.html>`_
+    :param unicode url: A ``postgres://`` URL or a `PostgreSQL connection
+        string
+        <http://www.postgresql.org/docs/current/static/libpq-connect.html>`_
     :param int minconn: The minimum size of the connection pool
     :param int maxconn: The maximum size of the connection pool
-    :param cursor_factory: Defaults to :py:class:`~psycopg2.extras.RealDictCursor`
+    :param cursor_factory: Defaults to
+        :py:class:`~psycopg2.extras.NamedTupleCursor`
 
     This is the main object that :py:mod:`postgres` provides, and you should
     have one instance per process for each PostgreSQL database your process
@@ -233,7 +268,7 @@ class Postgres(object):
     Check the :py:mod:`psycopg2` `docs
     <http://initd.org/psycopg/docs/extras.html#connection-and-cursor-subclasses>`_
     for additional :py:attr:`cursor_factories`, such as
-    :py:class:`NamedTupleCursor`.
+    :py:class:`RealDictCursor`.
 
     The names in our simple API, :py:meth:`~postgres.Postgres.run`,
     :py:meth:`~postgres.Postgres.all`, and
@@ -256,17 +291,28 @@ class Postgres(object):
     """
 
     def __init__(self, url, minconn=1, maxconn=10, \
-                                                cursor_factory=RealDictCursor):
+                                              cursor_factory=NamedTupleCursor):
         if url.startswith("postgres://"):
             dsn = url_to_dsn(url)
+        else:
+            dsn = url
+
+
+        # Set up connection pool.
+        # =======================
 
         Connection.cursor_factory = cursor_factory
-
         self.pool = ConnectionPool( minconn=minconn
                                   , maxconn=maxconn
                                   , dsn=dsn
                                   , connection_factory=Connection
                                    )
+
+        # Set up orm helpers.
+        # ===================
+
+        self.model_registry = {}
+        self.DelegatingCaster = make_DelegatingCaster(self)
 
 
     def run(self, sql, parameters=None):
@@ -277,9 +323,10 @@ class Postgres(object):
         :type parameters: dict or tuple
         :returns: :py:const:`None`
 
-        >>> db.run("CREATE TABLE foo (bar text)")
-        >>> db.run("INSERT INTO foo VALUES ('baz')")
-        >>> db.run("INSERT INTO foo VALUES ('buz')")
+        >>> db.run("DROP TABLE IF EXISTS foo CASCADE")
+        >>> db.run("CREATE TABLE foo (bar text, baz int)")
+        >>> db.run("INSERT INTO foo VALUES ('buz', 42)")
+        >>> db.run("INSERT INTO foo VALUES ('bit', 537)")
 
         """
         with self.get_transaction() as txn:
@@ -292,18 +339,30 @@ class Postgres(object):
         :param unicode sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
         :type parameters: dict or tuple
-        :returns: :py:class:`list` of rows
+        :returns: :py:class:`list` of records or single values
 
-        >>> for row in db.all("SELECT bar FROM foo"):
-        ...     print(row["bar"])
+        >>> for value in db.all("SELECT bar FROM foo"):
+        ...     print(value)
         ...
-        baz
         buz
+        bit
+
+        If the query results in a single column, we return a list of values
+        rather than a list of records of values.
+
+        >>> for value in db.all("SELECT bar FROM foo"):
+        ...     print(value)
+        ...
+        buz
+        bit
 
         """
         with self.get_transaction() as txn:
             txn.execute(sql, parameters)
-            return txn.fetchall()
+            recs = txn.fetchall()
+            if recs and len(recs[0]) == 1:
+                recs = [rec[0] for rec in recs]
+            return recs
 
 
     def one_or_zero(self, sql, parameters=None, zero=None):
@@ -325,10 +384,16 @@ class Postgres(object):
         ...
         No blam yet.
 
+        If the query returns one result and that result has one field and the
+        value of that field is a :py:class:`~postgres.orm.Model` subclass, then
+        we'll unravel and return just that instance for you.
+
         """
         out = self._some(sql, parameters, 0, 1)
         if out is None:
             out = zero
+        elif len(out) == 1 and isinstance(out[0], Model):
+            out = out[0]
         return out
 
 
@@ -367,7 +432,7 @@ class Postgres(object):
         ...     txn.execute("SELECT * FROM foo")
         ...     txn.fetchall()
         ...
-        [{'bar': 'baz'}, {'bar': 'buz'}]
+        [Record(bar=u'buz', baz=42), Record(bar=u'bit', baz=537)]
 
         """
         return TransactionContextManager(self.pool, *a, **kw)
@@ -385,10 +450,66 @@ class Postgres(object):
         ...     cursor.execute("SELECT * FROM foo")
         ...     cursor.fetchall()
         ...
-        [{'bar': 'baz'}, {'bar': 'buz'}]
+        [Record(bar=u'buz', baz=42), Record(bar=u'bit', baz=537)]
 
         """
         return ConnectionContextManager(self.pool)
+
+    def register_model(self, ModelSubclass):
+        """Register an ORM model.
+
+        :param ModelSubclass: the :py:class:`~postgres.orm.Model` subclass to
+            register with this :py:class:`~postgres.Postgres` instance
+        :raises: :py:exc:`~postgres.NotAModel`, :py:exc:`~postgres.NoSuchType`,
+            :py:exc:`~postgres.AlreadyRegistered`
+
+        .. note::
+
+            See the :py:mod:`~postgres.orm` docs for instructions on
+            subclassing :py:class:`~postgres.orm.Model`.
+
+        """
+        if not issubclass(ModelSubclass, Model):
+            raise NotAModel(ModelSubclass)
+
+        n = self.one_or_zero( "SELECT count(*) FROM pg_type WHERE typname=%s"
+                            , (ModelSubclass.typname,)
+                             )[0]
+        if n < 1:
+            # Could be more than one since we don't constrain by typnamespace.
+            raise NoSuchType(ModelSubclass.typname)
+
+        if ModelSubclass.typname in self.model_registry:
+            existing_model = self.model_registry[ModelSubclass.typname]
+            raise AlreadyRegistered(existing_model, ModelSubclass.typname)
+
+        self.model_registry[ModelSubclass.typname] = ModelSubclass
+        ModelSubclass.db = self
+
+        # register a composite (but don't use RealDictCursor, not sure why)
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RegularCursor)
+            register_composite( ModelSubclass.typname.encode('UTF-8')
+                              , cursor
+                              , globally=True
+                              , factory=self.DelegatingCaster
+                               )
+
+    def unregister_model(self, ModelSubclass):
+        """Unregister an ORM model.
+
+        :param ModelSubclass: the :py:class:`~postgres.orm.Model` subclass to
+            unregister
+        :raises: :py:exc:`~postgres.NotRegistered`
+
+        """
+        key = None
+        for key, v in self.model_registry.items():
+            if v is ModelSubclass:
+                break
+        if key is None:
+            raise NotRegistered(ModelSubclass)
+        del self.model_registry[key]
 
 
 class Connection(psycopg2.extensions.connection):
@@ -421,7 +542,7 @@ class TransactionContextManager(object):
     call.
 
     The return value of :py:func:`TransactionContextManager.__enter__` is a
-    :py:class:`psycopg2.extras.RealDictCursor`. Any positional and keyword
+    :py:class:`psycopg2.extras.NamedTupleCursor`. Any positional and keyword
     arguments to our constructor are passed through to the cursor constructor.
     When the block starts, the :py:class:`~postgres.Connection` underlying the
     cursor is checked out of the connection pool and :py:attr:`autocommit` is
@@ -487,3 +608,43 @@ class ConnectionContextManager(object):
         self.conn.rollback()
         self.conn.autocommit = False
         self.pool.putconn(self.conn)
+
+
+# ORM Helper
+# ==========
+
+def make_DelegatingCaster(db):
+    """Define a :py:class:`~psycopg2.extras.CompositeCaster` subclass that
+        delegates to :py:attr:`~postgres.Postgres.model_registry`.
+
+    :param db: a :py:class:`~postgres.Postgres` instance
+    :returns: a :py:class:`DelegatingCaster` class
+
+    The class we return will use the :py:attr:`model_registry` of the given
+    :py:class:`~postgres.Postgres` instance to look up a
+    :py:class:`~postgres.orm.Model` subclass to use in mapping
+    :py:mod:`psycopg2` return values to higher-order Python objects. Yeah, it's
+    a little squirrelly. :-/
+
+    """
+    class DelegatingCaster(CompositeCaster):
+        def make(self, values):
+            if self.name not in db.model_registry:
+
+                # This is probably a bug, not a normal user error. It means
+                # we've called register_composite for this typname without also
+                # registering with model_registry.
+
+                raise NotImplementedError
+
+            ModelSubclass = db.model_registry[self.name]
+            return ModelSubclass(**dict(zip(self.attnames, values)))
+
+    return DelegatingCaster
+
+
+if __name__ == '__main__':
+    db = Postgres("postgres://jrandom@localhost/test")
+    db.run("DROP TABLE IF EXISTS foo CASCADE")
+    import doctest
+    doctest.testmod()
