@@ -219,20 +219,25 @@ class NotAModel(Exception):
                "orm models. {} (registered for {}) doesn't fit the bill." \
                .format(self.args[0].__name__, self.args[1])
 
+class NoTypeSpecified(Exception):
+    def __str__(self):
+        return "You tried to register {} as an orm model, but it has no "\
+               "typname attribute.".format(self.args[0].__name__)
+
 class NoSuchType(Exception):
     def __str__(self):
-        return "You tried to register an orm Model for typname {}, but no "\
+        return "You tried to register an orm model for typname {}, but no "\
                "such type exists in the pg_type table of your database." \
                .format(self.args[0])
 
 class AlreadyRegistered(Exception):
     def __str__(self):
-        return "The Model {} is already registered for the typname {}." \
+        return "The model {} is already registered for the typname {}." \
                .format(self.args[0].__name__, self.args[1])
 
 class NotRegistered(Exception):
     def __str__(self):
-        return "The Model {} is not registered.".format(self.args[0].__name__)
+        return "The model {} is not registered.".format(self.args[0].__name__)
 
 
 # The Main Event
@@ -460,7 +465,9 @@ class Postgres(object):
 
         :param ModelSubclass: the :py:class:`~postgres.orm.Model` subclass to
             register with this :py:class:`~postgres.Postgres` instance
-        :raises: :py:exc:`~postgres.NotAModel`, :py:exc:`~postgres.NoSuchType`,
+        :raises: :py:exc:`~postgres.NotAModel`,
+            :py:exc:`~postgres.NoTypeSpecified`,
+            :py:exc:`~postgres.NoSuchType`,
             :py:exc:`~postgres.AlreadyRegistered`
 
         .. note::
@@ -471,6 +478,9 @@ class Postgres(object):
         """
         if not issubclass(ModelSubclass, Model):
             raise NotAModel(ModelSubclass)
+
+        if getattr(ModelSubclass, 'typname', None) is None:
+            raise NoTypeSpecified(ModelSubclass)
 
         n = self.one_or_zero( "SELECT count(*) FROM pg_type WHERE typname=%s"
                             , (ModelSubclass.typname,)
