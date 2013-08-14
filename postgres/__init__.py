@@ -341,20 +341,14 @@ class Postgres(object):
         :type parameters: dict or tuple
         :returns: :py:class:`list` of records or single values
 
-        >>> for value in db.all("SELECT bar FROM foo"):
-        ...     print(value)
-        ...
-        buz
-        bit
+        >>> db.all("SELECT * FROM foo ORDER BY bar")
+        [Record(bar=u'bit', baz=537), Record(bar=u'buz', baz=42)]
 
         If the query results in a single column, we return a list of values
         rather than a list of records of values.
 
-        >>> for value in db.all("SELECT bar FROM foo"):
-        ...     print(value)
-        ...
-        buz
-        bit
+        >>> db.all("SELECT bar FROM foo ORDER BY bar")
+        ['bit', 'buz']
 
         """
         with self.get_transaction() as txn:
@@ -378,21 +372,25 @@ class Postgres(object):
         Use this for the common case where there should only be one record, but
         it may not exist yet.
 
+        >>> db.one_or_zero("SELECT * FROM foo WHERE bar='buz'")
+        Record(bar=u'buz', baz=42)
         >>> row = db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
         >>> if row is None:
         ...     print("No blam yet.")
         ...
         No blam yet.
 
-        If the query returns one result and that result has one field and the
-        value of that field is a :py:class:`~postgres.orm.Model` subclass, then
-        we'll unravel and return just that instance for you.
+        If the query result has only one column, then we dereference that for
+        you.
+
+        >>> db.one_or_zero("SELECT baz FROM foo WHERE bar='buz'")
+        42
 
         """
         out = self._some(sql, parameters, 0, 1)
         if out is None:
             out = zero
-        elif len(out) == 1 and isinstance(out[0], Model):
+        elif len(out) == 1:
             out = out[0]
         return out
 

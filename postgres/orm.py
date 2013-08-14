@@ -94,9 +94,9 @@ Second, register your model with your :py:class:`~postgres.Postgres` instance:
 That will plug your model into the :py:mod:`psycopg2` composite casting
 machinery, and you'll now get instances of your model back from
 :py:meth:`~postgres.Postgres.all` and :py:meth:`~postgres.Postgres.one_or_zero`
-when you cast your query results to the relevant type. If your query returns
-more than one column, you'll need to dereference the column containing the
-model just as with any other query:
+when you cast to the relevant type in your query. If your query returns more
+than one column, you'll need to dereference the column containing the model
+just as with any other query:
 
     >>> rec = db.one_or_zero("SELECT foo.*::foo, bar.* "
     ...                      "FROM foo JOIN bar ON foo.bar = bar.bar "
