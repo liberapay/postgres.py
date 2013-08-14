@@ -32,18 +32,20 @@ Use :py:meth:`~postgres.Postgres.run` to run SQL statements:
 Use :py:meth:`~postgres.Postgres.all` to run SQL and fetch all results:
 
     >>> db.all("SELECT * FROM foo ORDER BY bar")
-    [Record(bar=u'bit', baz=537), Record(bar=u'buz', baz=42)]
+    [Record(bar='bit', baz=537), Record(bar='buz', baz=42)]
 
 Use :py:meth:`~postgres.Postgres.one_or_zero` to run SQL and fetch one result
 or :py:class:`None`:
 
     >>> db.one_or_zero("SELECT * FROM foo WHERE bar='buz'")
-    Record(bar=u'buz', baz=42)
+    Record(bar='buz', baz=42)
     >>> db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
 
-If your query returns one column then you get a list of values instead of
-Records:
+If your queries return one column then you get just the value or a list of
+values instead of a Record or list of Records:
 
+    >>> db.one_or_zero("SELECT baz FROM foo WHERE bar='buz'")
+    42
     >>> db.all("SELECT baz FROM foo ORDER BY bar")
     [537, 42]
 
@@ -59,7 +61,7 @@ against `SQL injection`_. (This is inspired by old-style Python string
 formatting, but it is not the same.)
 
     >>> db.one_or_zero("SELECT * FROM foo WHERE bar=%(bar)s", {"bar": "buz"})
-    Record(bar=u'buz', baz=42)
+    Record(bar='buz', baz=42)
 
 Never build SQL strings out of user input!
 
@@ -89,7 +91,7 @@ connection pooling and automatic transaction management:
     ...     txn.execute("SELECT * FROM foo ORDER BY bar")
     ...     txn.fetchall()
     ...
-    [Record(bar=u'bit', baz=537), Record(bar=u'blam', baz=None), Record(bar=u'buz', baz=42)]
+    [Record(bar='bit', baz=537), Record(bar='blam', baz=None), Record(bar='buz', baz=42)]
 
 Note that other calls won't see the changes on your transaction until the end
 of your code block, when the context manager commits the transaction for you::
@@ -99,9 +101,9 @@ of your code block, when the context manager commits the transaction for you::
     ...     txn.execute("INSERT INTO foo VALUES ('blam')")
     ...     db.all("SELECT * FROM foo ORDER BY bar")
     ...
-    [Record(bar=u'bit', baz=537), Record(bar=u'buz', baz=42)]
+    [Record(bar='bit', baz=537), Record(bar='buz', baz=42)]
     >>> db.all("SELECT * FROM foo ORDER BY bar")
-    [Record(bar=u'bit', baz=537), Record(bar=u'blam', baz=None), Record(bar=u'buz', baz=42)]
+    [Record(bar='bit', baz=537), Record(bar='blam', baz=None), Record(bar='buz', baz=42)]
 
 The :py:func:`~postgres.Postgres.get_transaction` manager gives you a cursor
 with :py:attr:`autocommit` turned off on its connection. If the block under
@@ -117,7 +119,7 @@ connection straight from the connection pool:
     ...     cursor.execute("SELECT * FROM foo ORDER BY bar")
     ...     cursor.fetchall()
     ...
-    [Record(bar=u'bit', baz=537), Record(bar=u'buz', baz=42)]
+    [Record(bar='bit', baz=537), Record(bar='buz', baz=42)]
 
 A connection gotten in this way will have :py:attr:`autocommit` turned off, and
 it'll never be implicitly committed otherwise. It'll actually be rolled back
@@ -342,13 +344,13 @@ class Postgres(object):
         :returns: :py:class:`list` of records or single values
 
         >>> db.all("SELECT * FROM foo ORDER BY bar")
-        [Record(bar=u'bit', baz=537), Record(bar=u'buz', baz=42)]
+        [Record(bar='bit', baz=537), Record(bar='buz', baz=42)]
 
         If the query results in a single column, we return a list of values
         rather than a list of records of values.
 
-        >>> db.all("SELECT bar FROM foo ORDER BY bar")
-        ['bit', 'buz']
+        >>> db.all("SELECT baz FROM foo ORDER BY bar")
+        [537, 42]
 
         """
         with self.get_transaction() as txn:
@@ -373,7 +375,7 @@ class Postgres(object):
         it may not exist yet.
 
         >>> db.one_or_zero("SELECT * FROM foo WHERE bar='buz'")
-        Record(bar=u'buz', baz=42)
+        Record(bar='buz', baz=42)
         >>> row = db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
         >>> if row is None:
         ...     print("No blam yet.")
@@ -430,7 +432,7 @@ class Postgres(object):
         ...     txn.execute("SELECT * FROM foo")
         ...     txn.fetchall()
         ...
-        [Record(bar=u'buz', baz=42), Record(bar=u'bit', baz=537)]
+        [Record(bar='buz', baz=42), Record(bar='bit', baz=537)]
 
         """
         return TransactionContextManager(self.pool, *a, **kw)
@@ -448,7 +450,7 @@ class Postgres(object):
         ...     cursor.execute("SELECT * FROM foo")
         ...     cursor.fetchall()
         ...
-        [Record(bar=u'buz', baz=42), Record(bar=u'bit', baz=537)]
+        [Record(bar='buz', baz=42), Record(bar='bit', baz=537)]
 
         """
         return ConnectionContextManager(self.pool)
