@@ -161,7 +161,7 @@ import psycopg2
 from postgres.orm import Model
 from psycopg2.extensions import cursor as RegularCursor
 from psycopg2.extras import register_composite, CompositeCaster
-from psycopg2.extras import NamedTupleCursor
+from psycopg2.extras import NamedTupleCursor, RealDictCursor
 from psycopg2.pool import ThreadedConnectionPool as ConnectionPool
 
 
@@ -340,7 +340,7 @@ class Postgres(object):
             txn.execute(sql, parameters)
 
 
-    def all(self, sql, parameters=None):
+    def all(self, sql, parameters=None, cursor_factory=None):
         """Execute a query and return all results.
 
         :param unicode sql: the SQL statement to execute
@@ -358,7 +358,7 @@ class Postgres(object):
         [537, 42]
 
         """
-        with self.get_transaction() as txn:
+        with self.get_transaction(cursor_factory=cursor_factory) as txn:
             txn.execute(sql, parameters)
             recs = txn.fetchall()
             if recs and len(recs[0]) == 1:
@@ -366,7 +366,8 @@ class Postgres(object):
             return recs
 
 
-    def one_or_zero(self, sql, parameters=None, zero=None):
+    def one_or_zero(self, sql, parameters=None, zero=None, \
+                                                          cursor_factory=None):
         """Execute a query and return a single result or a default value.
 
         :param unicode sql: the SQL statement to execute
@@ -394,7 +395,7 @@ class Postgres(object):
         42
 
         """
-        out = self._some(sql, parameters, 0, 1)
+        out = self._some(sql, parameters, 0, 1, cursor_factory)
         if out is None:
             out = zero
         elif len(out) == 1:
@@ -402,14 +403,14 @@ class Postgres(object):
         return out
 
 
-    def _some(self, sql, parameters=None, lo=0, hi=1):
+    def _some(self, sql, parameters, lo, hi, cursor_factory):
 
         # This is undocumented (and largely untested) because I think it's a
         # rare case where this is wanted directly. It was added to make one and
         # one_or_zero DRY when we had one. Help yourself to it now that you've
         # found it. :^)
 
-        with self.get_transaction() as txn:
+        with self.get_transaction(cursor_factory=cursor_factory) as txn:
             txn.execute(sql, parameters)
 
             if txn.rowcount < lo:
@@ -575,6 +576,9 @@ class TransactionContextManager(object):
         """
         self.conn = self.pool.getconn()
         self.conn.autocommit = False
+        if 'cursor_factory' in self.kw:
+            if self.kw['cursor_factory'] is None:
+                del self.kw['cursor_factory']
         self.cursor = self.conn.cursor(*self.a, **self.kw)
         return self.cursor
 
