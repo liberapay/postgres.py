@@ -9,6 +9,8 @@ Installation
 
     $ pip install postgres
 
+:py:mod:`postgres` requires :py:mod:`psycopg2` version 2.5 or higher.
+
 We `test <https://travis-ci.org/gittip/postgres.py>`_ against Python 2.6, 2.7,
 3.2, and 3.3. We don't yet have a testing matrix for different versions of
 :py:mod:`psycopg2` or PostgreSQL.

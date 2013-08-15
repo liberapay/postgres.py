@@ -6,5 +6,5 @@ setup( name='postgres'
      , url='https://postgres-py.readthedocs.org'
      , version='2.0.0-dev'
      , packages=find_packages()
-     , install_requires=['psycopg2 >= 2.0.0']
+     , install_requires=['psycopg2 >= 2.5.0']
       )
