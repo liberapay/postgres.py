@@ -1,14 +1,30 @@
-""":py:mod:`postgres` implements an object-relational mapper based on
-:py:mod:`psycopg2` composite casters. The fundamental technique, introduced by
-`Michael Robbelard at PyOhio 2013`_, is to write SQL queries that typecast
-results to table types, and then use a :py:mod:`psycopg2`
-:py:class:`~psycopg2.extra.CompositeCaster` to map these to Python objects.
-This means we get to define our schema in SQL, and we get to write our queries
-in SQL, and we get to explicitly indicate in our SQL queries how Python should
-map the results to objects, and then we can write Python objects that contain
-only business logic and not schema definitions.
+"""
+
+It's somewhat of a fool's errand to introduce a Python ORM in 2013, with
+`SQLAlchemy`_ ascendant (`Django's ORM`_ not-withstanding). And yet here we
+are. SQLAlchemy is mature and robust and full-featured. This makes it complex,
+difficult to learn, and kind of scary. The ORM we introduce here is simpler: it
+targets PostgreSQL only, it depends on raw SQL (it has no object model for
+schema definition nor one for query construction), and it never updates your
+database for you. You are in full, direct control of your application's
+database usage.
+
+.. _SQLAlchemy: http://www.sqlalchemy.org/
+.. _Django's ORM: http://www.djangobook.com/en/2.0/chapter05.html
+
+The fundamental technique we employ, introduced by `Michael Robbelard at PyOhio
+2013`_, is to write SQL queries that typecast results to table types, and then
+use a :py:mod:`psycopg2` :py:class:`~psycopg2.extra.CompositeCaster` to map
+these to Python objects.  This means we get to define our schema in SQL, and we
+get to write our queries in SQL, and we get to explicitly indicate in our SQL
+queries how Python should map the results to objects, and then we can write
+Python objects that contain only business logic and not schema definitions.
 
 .. _Michael Robbelard at PyOhio 2013: https://www.youtube.com/watch?v=Wz1_GYc4GmU#t=25m06s
+
+
+Introducing Table Types
+-----------------------
 
 Every table in PostgreSQL has a type associated with it, which is the column
 definition for that table. These are composite types just like any other
@@ -72,6 +88,8 @@ includes table and view types, and that is the basis for
 :py:mod:`postgres.orm`. We map based on types, not tables.
 
 
+.. _orm-tutorial:
+
 ORM Tutorial
 ------------
 
@@ -106,15 +124,45 @@ just as with any other query:
     >>> rec.bar
     'blam'
 
-As usual, if your query only returns one column, then
+And as usual, if your query only returns one column, then
 :py:meth:`~postgres.Postgres.all` and :py:meth:`~postgres.Postgres.one_or_zero`
 will do the dereferencing for you:
 
+    >>> [foo.bar for foo in db.all("SELECT foo.*::foo FROM foo")]
+    ['blam', 'whit']
     >>> foo = db.one_or_zero("SELECT foo.*::foo FROM foo WHERE bar='blam'")
     >>> foo.bar
     'blam'
-    >>> [foo.bar for foo in db.all("SELECT foo.*::foo FROM foo")]
-    ['blam', 'whit']
+
+To update your database, add a method to your model:
+
+    >>> db.unregister_model(Foo)
+    >>> class Foo(Model):
+    ...
+    ...     typname = "foo"
+    ...
+    ...     def set_baz(self, baz):
+    ...         self.db.run( "UPDATE foo SET baz=%s WHERE bar=%s"
+    ...                    , (baz, self.bar)
+    ...                     )
+    ...         self.update_attributes(baz=baz)
+    ...
+    >>> db.register_model(Foo)
+
+Then use that method to update the database:
+
+    >>> db.one_or_zero("SELECT baz FROM foo WHERE bar='blam'")
+    >>> foo = db.one_or_zero("SELECT foo.*::foo FROM foo WHERE bar='blam'")
+    42
+    >>> foo.set_baz(90210)
+    >>> foo.baz
+    90210
+    >>> db.one_or_zero("SELECT baz FROM foo WHERE bar='blam'")
+    90210
+
+We never update your database for you. We also never sync your objects for you:
+note the use of the :py:meth:`~postgres.orm.Model.update_attributes` method to
+sync our instance after modifying the database.
 
 
 The Model Base Class
