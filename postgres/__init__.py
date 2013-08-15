@@ -394,12 +394,20 @@ class Postgres(object):
         >>> db.one_or_zero("SELECT baz FROM foo WHERE bar='buz'")
         42
 
+        And if the dereferenced value is :py:class:`None`, we return the value
+        of :py:attr:`zero`:
+
+        >>> db.one_or_zero("SELECT sum(baz) FROM foo WHERE bar='nope'", zero=0)
+        0
+
         """
         out = self._some(sql, parameters, 0, 1, cursor_factory)
         if out is None:
             out = zero
         elif len(out) == 1:
             out = out[0]
+            if out is None:
+                out = zero
         return out
 
 
