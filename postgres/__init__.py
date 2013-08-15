@@ -579,6 +579,10 @@ class TransactionContextManager(object):
         if 'cursor_factory' in self.kw:
             if self.kw['cursor_factory'] is None:
                 del self.kw['cursor_factory']
+            elif self.kw['cursor_factory'] is dict:
+                self.kw['cursor_factory'] = RealDictCursor
+            elif self.kw['cursor_factory'] is tuple:
+                self.kw['cursor_factory'] = RegularCursor
         self.cursor = self.conn.cursor(*self.a, **self.kw)
         return self.cursor
 
