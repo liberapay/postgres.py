@@ -6,8 +6,8 @@ postgres
     :member-order: bysource
 
 
-The Object-Relational Mapper (ORM)
-----------------------------------
+An Object-Relational Mapper (ORM)
+---------------------------------
 
 .. automodule:: postgres.orm
     :members:
