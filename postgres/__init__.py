@@ -45,12 +45,14 @@ or :py:class:`None`:
     >>> db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
 
 If your queries return one column then you get just the value or a list of
-values instead of a Record or list of Records:
+values instead of a record or list of records:
 
     >>> db.one_or_zero("SELECT baz FROM foo WHERE bar='buz'")
     42
     >>> db.all("SELECT baz FROM foo ORDER BY bar")
     [537, 42]
+
+Jump ahead for the :ref:`orm-tutorial`.
 
 
 Bind Parameters
@@ -145,6 +147,7 @@ The Postgres Object
 """
 from __future__ import print_function, unicode_literals
 
+import sys
 try:                    # Python 2
     import urlparse
 
@@ -159,6 +162,7 @@ try:                    # Python 2
 
 except ImportError:     # Python 3
     import urllib.parse as urlparse
+from collections import namedtuple
 
 import psycopg2
 from postgres.orm import Model
@@ -242,6 +246,11 @@ class NotRegistered(Exception):
     def __str__(self):
         return "The model {} is not registered.".format(self.args[0].__name__)
 
+class BadRecordType(Exception):
+    def __str__(self):
+        return "Bad record_type: {}. Available record_types are: tuple, namedtuple, " \
+               "dict, or None to use the default.".format(self.args[0])
+
 
 # The Main Event
 # ==============
@@ -275,10 +284,18 @@ class Postgres(object):
     :py:class:`~postgres.Postgres` instance is that it runs everything through
     its connection pool.
 
-    Check the :py:mod:`psycopg2` `docs
+    :py:attr:`cursor_factory` sets the default cursor that connections managed
+    by this :py:class:`~postgres.Postgres` instance will use. Check the
+    :py:mod:`psycopg2` `docs
     <http://initd.org/psycopg/docs/extras.html#connection-and-cursor-subclasses>`_
-    for additional :py:attr:`cursor_factories`, such as
-    :py:class:`RealDictCursor`.
+    for additional options, such as :py:class:`psycopg2.extras.RealDictCursor`.
+    Use :py:class:`psycopg2.extensions.cursor` for the default
+    :py:mod:`psycopg2` behavior, which is to return tuples. Whatever default
+    you set here, you can override that default on a per-call basis by passing
+    :py:attr:`record_type` or :py:attr:`cursor_factory` to
+    :py:meth:`~postgres.Postgres.all`,
+    :py:meth:`~postgres.Postgres.one_or_zero`, and
+    :py:meth:`~postgres.Postgres.get_transaction`.
 
     The names in our simple API, :py:meth:`~postgres.Postgres.run`,
     :py:meth:`~postgres.Postgres.all`, and
@@ -287,7 +304,7 @@ class Postgres(object):
     :py:meth:`fetchall`, and :py:meth:`fetchone` methods, which have slightly
     different semantics (under DB-API 2.0 you call :py:meth:`execute` on a
     cursor and then call one of the :py:meth:`fetch*` methods on the same
-    cursor to retrieve rows; with our simple API there is no second
+    cursor to retrieve records; with our simple API there is no second
     :py:meth:`fetch` step). See `this ticket`_ for more of the rationale behind
     these names. The context managers on this class are named starting with
     :py:meth:`get_` to set them apart from the simple-case API.  Note that when
@@ -311,7 +328,8 @@ class Postgres(object):
         # Set up connection pool.
         # =======================
 
-        Connection.cursor_factory = cursor_factory
+        self.default_cursor_factory = cursor_factory
+        Connection = make_Connection(self)
         self.pool = ConnectionPool( minconn=minconn
                                   , maxconn=maxconn
                                   , dsn=dsn
@@ -325,12 +343,16 @@ class Postgres(object):
         self.DelegatingCaster = make_DelegatingCaster(self)
 
 
-    def run(self, sql, parameters=None):
+    def run(self, sql, parameters=None, *a, **kw):
         """Execute a query and discard any results.
 
-        :param unicode sql: the SQL statement to execute
+        :param string sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
         :type parameters: dict or tuple
+        :param a: passed through to
+            :py:meth:`~postgres.Postgres.get_transaction`
+        :param kw: passed through to
+            :py:meth:`~postgres.Postgres.get_transaction`
         :returns: :py:const:`None`
 
         >>> db.run("DROP TABLE IF EXISTS foo CASCADE")
@@ -339,45 +361,92 @@ class Postgres(object):
         >>> db.run("INSERT INTO foo VALUES ('bit', 537)")
 
         """
-        with self.get_transaction() as txn:
+        with self.get_transaction(*a, **kw) as txn:
             txn.execute(sql, parameters)
 
 
-    def all(self, sql, parameters=None, cursor_factory=None):
+    def all(self, sql, parameters=None, record_type=None, *a, **kw):
         """Execute a query and return all results.
 
-        :param unicode sql: the SQL statement to execute
+        :param string sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
         :type parameters: dict or tuple
-        :returns: :py:class:`list` of records or single values
+        :param record_type: the type of record to return
+        :type record_type: type or string
+        :param a: passed through to
+            :py:meth:`~postgres.Postgres.get_transaction`
+        :param kw: passed through to
+            :py:meth:`~postgres.Postgres.get_transaction`
+        :returns: :py:class:`list` of records or :py:class:`list` of single
+            values
 
         >>> db.all("SELECT * FROM foo ORDER BY bar")
         [Record(bar='bit', baz=537), Record(bar='buz', baz=42)]
 
-        If the query results in a single column, we return a list of values
-        rather than a list of records of values.
+        You can use :py:attr:`record_type` to override the type associated with
+        the default :py:attr:`cursor_factory` for your
+        :py:class:`~postgres.Postgres` instance:
+
+        >>> db.default_cursor_factory
+        <class 'psycopg2.extras.NamedTupleCursor'>
+        >>> db.all("SELECT * FROM foo ORDER BY bar", record_type=dict)
+        [{'bar': 'bit', 'baz': 537}, {'bar': 'buz', 'baz': 42}]
+
+        That's a convenience so you don't have to go to the trouble of
+        remembering where :py:class:`~psycopg2.extras.RealDictCursor` lives and
+        importing it in order to get dictionaries back. If you do need more
+        control (maybe you have a custom cursor class), you can pass
+        :py:attr:`cursor_factory` explicitly, and that will override any
+        :py:attr:`record_type`:
+
+        >>> from psycopg2.extensions import cursor
+        >>> db.all( "SELECT * FROM foo ORDER BY bar"
+        ...       , record_type=dict
+        ...       , cursor_factory=cursor
+        ...        )
+        [('bit', 537), ('buz', 42)]
+
+        If the query results in records with a single column, we return a list
+        of the values in that column rather than a list of records of values.
 
         >>> db.all("SELECT baz FROM foo ORDER BY bar")
         [537, 42]
 
+        This works for record types that are mappings (anything with a
+        :py:meth:`__len__` and a :py:meth:`values` method) as well those that
+        are sequences:
+
+        >>> db.all("SELECT baz FROM foo ORDER BY bar", record_type=dict)
+        [537, 42]
+
         """
-        with self.get_transaction(cursor_factory=cursor_factory) as txn:
+        with self.get_transaction(record_type=record_type, *a, **kw) as txn:
             txn.execute(sql, parameters)
             recs = txn.fetchall()
-            if recs and len(recs[0]) == 1:
-                recs = [rec[0] for rec in recs]
+            if recs and len(recs[0]) == 1:          # dereference
+                if hasattr(recs[0], 'values'):      # mapping
+                    recs = [list(rec.values())[0] for rec in recs]
+                else:                               # sequence
+                    recs = [rec[0] for rec in recs]
             return recs
 
 
-    def one_or_zero(self, sql, parameters=None, zero=None, \
-                                                          cursor_factory=None):
+    def one_or_zero(self, sql, parameters=None, record_type=None, zero=None, \
+                                                                     *a, **kw):
         """Execute a query and return a single result or a default value.
 
-        :param unicode sql: the SQL statement to execute
+        :param string sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
         :type parameters: dict or tuple
-        :returns: a single row or the value of the :py:attr:`zero` argument
+        :param record_type: the type of record to return
+        :type record_type: type or string
         :param zero: the value to return if zero results are found
+        :param a: passed through to
+            :py:meth:`~postgres.Postgres.get_transaction`
+        :param kw: passed through to
+            :py:meth:`~postgres.Postgres.get_transaction`
+        :returns: a single record or value or the value of the :py:attr:`zero`
+            argument
         :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
 
         Use this for the common case where there should only be one record, but
@@ -385,11 +454,50 @@ class Postgres(object):
 
         >>> db.one_or_zero("SELECT * FROM foo WHERE bar='buz'")
         Record(bar='buz', baz=42)
-        >>> row = db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
-        >>> if row is None:
+
+        If the record doesn't exist, we return :py:class:`None`:
+
+        >>> record = db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
+        >>> if record is None:
         ...     print("No blam yet.")
         ...
         No blam yet.
+
+        If you pass :py:attr:`zero` we'll return that instead of
+        :py:class:`None`:
+
+        >>> db.one_or_zero("SELECT * FROM foo WHERE bar='blam'", zero=False)
+        False
+
+        We specifically don't support passing lambdas or other callables for
+        the :py:attr:`zero` parameter. That gets complicated quickly, and it's
+        easy to just check the return value in the caller and do your extra
+        logic there.
+
+        You can use :py:attr:`record_type` to override the type associated with
+        the default :py:attr:`cursor_factory` for your
+        :py:class:`~postgres.Postgres` instance:
+
+        >>> db.default_cursor_factory
+        <class 'psycopg2.extras.NamedTupleCursor'>
+        >>> db.one_or_zero( "SELECT * FROM foo WHERE bar='buz'"
+        ...               , record_type=dict
+        ...                )
+        {'bar': 'buz', 'baz': 42}
+
+        That's a convenience so you don't have to go to the trouble of
+        remembering where :py:class:`~psycopg2.extras.RealDictCursor` lives and
+        importing it in order to get dictionaries back. If you do need more
+        control (maybe you have a custom cursor class), you can pass
+        :py:attr:`cursor_factory` explicitly, and that will override any
+        :py:attr:`record_type`:
+
+        >>> from psycopg2.extensions import cursor
+        >>> db.one_or_zero( "SELECT * FROM foo WHERE bar='buz'"
+        ...               , record_type=dict
+        ...               , cursor_factory=cursor
+        ...                )
+        ('buz', 42)
 
         If the query result has only one column, then we dereference that for
         you.
@@ -403,25 +511,39 @@ class Postgres(object):
         >>> db.one_or_zero("SELECT sum(baz) FROM foo WHERE bar='nope'", zero=0)
         0
 
+        Dereferencing will use :py:meth:`.values` if it exists on the record,
+        so it should work for both mappings and sequences.
+
+        >>> db.one_or_zero( "SELECT sum(baz) FROM foo WHERE bar='nope'"
+        ...               , record_type=dict
+        ...               , zero=0
+        ...                )
+        0
+
         """
-        out = self._some(sql, parameters, 0, 1, cursor_factory)
+
+        out = self._some(sql, parameters, 0, 1, record_type, *a, **kw)
+
+        # dereference
+        if out is not None and len(out) == 1:
+            seq = list(out.values()) if hasattr(out, 'values') else out
+            out = seq[0]
+
+        # zero
         if out is None:
             out = zero
-        elif len(out) == 1:
-            out = out[0]
-            if out is None:
-                out = zero
+
         return out
 
 
-    def _some(self, sql, parameters, lo, hi, cursor_factory):
+    def _some(self, sql, parameters, lo, hi, record_type, *a, **kw):
 
         # This is undocumented (and largely untested) because I think it's a
         # rare case where this is wanted directly. It was added to make one and
         # one_or_zero DRY when we had one. Help yourself to it now that you've
         # found it. :^)
 
-        with self.get_transaction(cursor_factory=cursor_factory) as txn:
+        with self.get_transaction(record_type=record_type, *a, **kw) as txn:
             txn.execute(sql, parameters)
 
             if txn.rowcount < lo:
@@ -430,6 +552,7 @@ class Postgres(object):
                 raise TooMany(txn.rowcount, lo, hi)
 
             return txn.fetchone()
+
 
     def get_transaction(self, *a, **kw):
         """Return a :py:class:`~postgres.TransactionContextManager` that uses
@@ -454,6 +577,7 @@ class Postgres(object):
         """
         return TransactionContextManager(self.pool, *a, **kw)
 
+
     def get_connection(self):
         """Return a :py:class:`~postgres.ConnectionContextManager` that uses
         our connection pool.
@@ -471,6 +595,7 @@ class Postgres(object):
 
         """
         return ConnectionContextManager(self.pool)
+
 
     def register_model(self, ModelSubclass):
         """Register an ORM model.
@@ -512,11 +637,15 @@ class Postgres(object):
         # register a composite (but don't use RealDictCursor, not sure why)
         with self.get_connection() as conn:
             cursor = conn.cursor(cursor_factory=RegularCursor)
-            register_composite( ModelSubclass.typname.encode('UTF-8')
+            name = ModelSubclass.typname
+            if sys.version_info[0] < 3:
+                name = name.encode('UTF-8')
+            register_composite( name
                               , cursor
                               , globally=True
                               , factory=self.DelegatingCaster
                                )
+
 
     def unregister_model(self, ModelSubclass):
         """Unregister an ORM model.
@@ -535,28 +664,6 @@ class Postgres(object):
         del self.model_registry[key]
 
 
-class Connection(psycopg2.extensions.connection):
-    """This is a subclass of :py:class:`psycopg2.extensions.connection`.
-
-    :py:class:`Postgres` uses this class as the :py:attr:`connection_factory`
-    for its connection pool. We use this subclass to support the
-    :py:attr:`cursor_factory` parameter to the :py:class:`Postgres`
-    constructor, and to ensure that the client encoding is ``UTF-8``.
-
-    """
-
-    cursor_factory = None   # set this before using this object
-
-    def __init__(self, *a, **kw):
-        psycopg2.extensions.connection.__init__(self, *a, **kw)
-        self.set_client_encoding('UTF-8')
-
-    def cursor(self, *a, **kw):
-        if 'cursor_factory' not in kw:
-            kw['cursor_factory'] = self.cursor_factory
-        return psycopg2.extensions.connection.cursor(self, *a, **kw)
-
-
 # Context Managers
 # ================
 
@@ -564,38 +671,41 @@ class TransactionContextManager(object):
     """Instantiated once per :py:func:`~postgres.Postgres.get_transaction`
     call.
 
+    :param pool: a :py:class:`psycopg2.pool.*ConnectionPool`
+
     The return value of :py:func:`TransactionContextManager.__enter__` is a
-    :py:class:`psycopg2.extras.NamedTupleCursor`. Any positional and keyword
-    arguments to our constructor are passed through to the cursor constructor.
-    When the block starts, the :py:class:`~postgres.Connection` underlying the
-    cursor is checked out of the connection pool and :py:attr:`autocommit` is
-    set to :py:const:`False`. If the block raises an exception, the
-    :py:class:`~postgres.Connection` is rolled back. Otherwise, it's committed.
-    In either case, the cursor is closed, and the
-    :py:class:`~postgres.Connection` is put back in the pool.
+    :py:mod:`psycopg2` cursor. Any positional and keyword arguments to our
+    constructor are passed through to the cursor constructor. If you pass
+    :py:attr:`record_type` as a keyword argument then we'll infer a
+    :py:attr:`cursor_factory` from that, though any explicit
+    :py:attr:`cursor_factory` keyword argument will take precedence.
+
+    When the block starts, a connection is checked out of the connection pool
+    and :py:attr:`autocommit` is set to :py:const:`False`. Then a cursor is
+    constructed and that is returned to the :py:attr:`with` statement. If the
+    block raises an exception, the connection is rolled back. Otherwise, it's
+    committed. In either case, the cursor is closed, :py:attr:`autocommit` is
+    reset to :py:class:`False` (just in case) and the connection is put back in
+    the pool.
 
     """
 
     def __init__(self, pool, *a, **kw):
         self.pool = pool
         self.a = a
-        self.kw = kw
+        self.kw = self.compute_cursor_factory(**kw)
         self.conn = None
+
 
     def __enter__(self):
         """Get a connection from the pool.
         """
         self.conn = self.pool.getconn()
         self.conn.autocommit = False
-        if 'cursor_factory' in self.kw:
-            if self.kw['cursor_factory'] is None:
-                del self.kw['cursor_factory']
-            elif self.kw['cursor_factory'] is dict:
-                self.kw['cursor_factory'] = RealDictCursor
-            elif self.kw['cursor_factory'] is tuple:
-                self.kw['cursor_factory'] = RegularCursor
+
         self.cursor = self.conn.cursor(*self.a, **self.kw)
         return self.cursor
+
 
     def __exit__(self, *exc_info):
         """Put our connection back in the pool.
@@ -609,8 +719,59 @@ class TransactionContextManager(object):
         self.pool.putconn(self.conn)
 
 
+    def compute_cursor_factory(self, **kw):
+        """Pull :py:attr:`record_type` out of :py:attr:`kw` and maybe add
+        :py:attr:`cursor_factory`.
+
+         Valid values for :py:attr:`record_type` are :py:class:`tuple`,
+         :py:class:`namedtuple`, :py:class:`dict` (or the strings ``tuple``,
+         ``namedtuple``, and ``dict``), and :py:class:`None`. If the value of
+         :py:attr:`record_type` is :py:class:`None`, then we won't insert any
+         :py:attr:`cursor_factory` keyword argument. Otherwise we'll specify a
+         :py:attr:`cursor_factory` that will result in records of the specific
+         type: :py:class:`psycopg2.extensions.cursor` for :py:class:`tuple`,
+         :py:class:`psycopg2.extras.NamedTupleCursor` for
+         :py:class:`namedtuple`, and
+         :py:class:`psycopg2.extensions.RealDictCursor` for :py:class:`dict`.
+
+        """
+
+        # Pull record_type out of kw.
+        # ===========================
+        # If we leave it in psycopg2 will complain. Our internal calls to
+        # get_transaction always have it but external use might not.
+
+        record_type = kw.pop('record_type', None)
+
+
+        if 'cursor_factory' not in kw:
+
+            # Compute cursor_factory from record_type.
+            # ====================================
+
+            cursor_factory_registry = { tuple: RegularCursor
+                                      , 'tuple': RegularCursor
+                                      , namedtuple: NamedTupleCursor
+                                      , 'namedtuple': NamedTupleCursor
+                                      , dict: RealDictCursor
+                                      , 'dict': RealDictCursor
+                                      , None: None
+                                        }
+
+            if record_type not in cursor_factory_registry:
+                raise BadRecordType(record_type)
+
+            cursor_factory = cursor_factory_registry[record_type]
+            if cursor_factory is not None:
+                kw['cursor_factory'] = cursor_factory
+
+        return kw
+
+
 class ConnectionContextManager(object):
     """Instantiated once per :py:func:`~postgres.Postgres.get_connection` call.
+
+    :param pool: a :py:class:`psycopg2.pool.*ConnectionPool`
 
     The return value of :py:func:`ConnectionContextManager.__enter__` is a
     :py:class:`postgres.Connection`. When the block starts, a
@@ -640,14 +801,51 @@ class ConnectionContextManager(object):
         self.pool.putconn(self.conn)
 
 
-# ORM Helper
-# ==========
+# Class Factories
+# ===============
 
-def make_DelegatingCaster(db):
+def make_Connection(postgres):
+    """Define and return a subclass of
+    :py:class:`psycopg2.extensions.connection`.
+
+    :param postgres: the :py:class:`~postgres.Postgres` instance to bind to
+    :returns: a :py:class:`Connection` class
+
+    The class defined and returned here will be linked to the instance of
+    :py:class:`~postgres.Postgres` that is passed in as :py:attr:`postgres` and
+    will use the :py:attr:`default_cursor_factory` attribute of that object.
+    The :py:class:`~postgres.Postgres` instance will use this class as the
+    :py:attr:`connection_factory` for its connection pool.
+
+    We also set client encoding to ``UTF-8``.
+
+    """
+    class Connection(psycopg2.extensions.connection):
+
+        def __init__(self, *a, **kw):
+            psycopg2.extensions.connection.__init__(self, *a, **kw)
+            self.set_client_encoding('UTF-8')
+            self.postgres = postgres
+
+        def cursor(self, *a, **kw):
+            """Extend the :py:meth:`psycopg2.extensions.connection.cursor`
+            method to take the default cursor factory from
+            :py:class:`~postgres.Postgres`. You can override the default by
+            passing the :py:attr:`cursor_factory` keyword argument.
+
+            """
+            if 'cursor_factory' not in kw:
+                kw['cursor_factory'] = self.postgres.default_cursor_factory
+            return psycopg2.extensions.connection.cursor(self, *a, **kw)
+
+    return Connection
+
+
+def make_DelegatingCaster(postgres):
     """Define a :py:class:`~psycopg2.extras.CompositeCaster` subclass that
         delegates to :py:attr:`~postgres.Postgres.model_registry`.
 
-    :param db: a :py:class:`~postgres.Postgres` instance
+    :param postgres: the :py:class:`~postgres.Postgres` instance to bind to
     :returns: a :py:class:`DelegatingCaster` class
 
     The class we return will use the :py:attr:`model_registry` of the given
@@ -659,7 +857,7 @@ def make_DelegatingCaster(db):
     """
     class DelegatingCaster(CompositeCaster):
         def make(self, values):
-            if self.name not in db.model_registry:
+            if self.name not in postgres.model_registry:
 
                 # This is probably a bug, not a normal user error. It means
                 # we've called register_composite for this typname without also
@@ -667,7 +865,7 @@ def make_DelegatingCaster(db):
 
                 raise NotImplementedError
 
-            ModelSubclass = db.model_registry[self.name]
+            ModelSubclass = postgres.model_registry[self.name]
             return ModelSubclass(**dict(zip(self.attnames, values)))
 
     return DelegatingCaster
