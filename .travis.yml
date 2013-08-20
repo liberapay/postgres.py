@@ -11,8 +11,8 @@ before_script:
   - psql -U postgres -c 'CREATE USER jrandom SUPERUSER;'
 script: 
   - DATABASE_URL=postgres://jrandom@localhost/test py.test tests.py -v
-  - DATABASE_URL=postgres://jrandom@localhost/test py.test tests.py -v
-  - DATABASE_URL=postgres://jrandom@localhost/test py.test tests.py -v
+  - python postgres/__init__.py -v
+  - python postgres/orm.py -v
 notifications:
   email: false
   irc: 
