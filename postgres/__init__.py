@@ -874,6 +874,8 @@ def make_DelegatingCaster(postgres):
 
 if __name__ == '__main__':
     db = Postgres("postgres://jrandom@localhost/test")
+    db.run("DROP SCHEMA IF EXISTS public CASCADE")
+    db.run("CREATE SCHEMA public")
     db.run("DROP TABLE IF EXISTS foo CASCADE")
     import doctest
     doctest.testmod()
