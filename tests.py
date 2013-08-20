@@ -99,7 +99,7 @@ class TestWrongNumberException(WithData):
                                   , parameters=None
                                   , lo=1
                                   , hi=1
-                                  , record_type=None
+                                  , back_as=None
                                    )
         except TooMany as exc:
             actual = str(exc)
@@ -113,7 +113,7 @@ class TestWrongNumberException(WithData):
                                   , parameters=None
                                   , lo=1
                                   , hi=3
-                                  , record_type=None
+                                  , back_as=None
                                    )
         except TooMany as exc:
             actual = str(exc)

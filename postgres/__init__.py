@@ -249,7 +249,7 @@ class NotRegistered(Exception):
 
 class BadRecordType(Exception):
     def __str__(self):
-        return "Bad record_type: {}. Available record_types are: tuple, " \
+        return "Bad back_as: {}. Available back_as values are: tuple, " \
                "namedtuple, dict, or None (to use the default)." \
                .format(self.args[0])
 
@@ -294,7 +294,7 @@ class Postgres(object):
     Use :py:class:`psycopg2.extensions.cursor` for the default
     :py:mod:`psycopg2` behavior, which is to return tuples. Whatever default
     you set here, you can override that default on a per-call basis by passing
-    :py:attr:`record_type` or :py:attr:`cursor_factory` to
+    :py:attr:`back_as` or :py:attr:`cursor_factory` to
     :py:meth:`~postgres.Postgres.one`, :py:meth:`~postgres.Postgres.all`, and
     :py:meth:`~postgres.Postgres.get_cursor`.
 
@@ -366,15 +366,14 @@ class Postgres(object):
             cursor.execute(sql, parameters)
 
 
-    def one(self, sql, parameters=None, record_type=None, default=None, \
-                                                                     *a, **kw):
+    def one(self, sql, parameters=None, back_as=None, default=None, *a, **kw):
         """Execute a query and return a single result or a default value.
 
         :param string sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
         :type parameters: dict or tuple
-        :param record_type: the type of record to return
-        :type record_type: type or string
+        :param back_as: the type of record to return
+        :type back_as: type or string
         :param default: the value to return if no results are found
         :param a: passed through to
             :py:meth:`~postgres.Postgres.get_cursor`
@@ -409,14 +408,14 @@ class Postgres(object):
         it's easy to just check the return value in the caller and do your
         extra logic there.
 
-        You can use :py:attr:`record_type` to override the type associated with
-        the default :py:attr:`cursor_factory` for your
+        You can use :py:attr:`back_as` to override the type associated with the
+        default :py:attr:`cursor_factory` for your
         :py:class:`~postgres.Postgres` instance:
 
         >>> db.default_cursor_factory
         <class 'psycopg2.extras.NamedTupleCursor'>
         >>> db.one( "SELECT * FROM foo WHERE bar='buz'"
-        ...       , record_type=dict
+        ...       , back_as=dict
         ...        )
         {'bar': 'buz', 'baz': 42}
 
@@ -425,11 +424,11 @@ class Postgres(object):
         importing it in order to get dictionaries back. If you do need more
         control (maybe you have a custom cursor class), you can pass
         :py:attr:`cursor_factory` explicitly, and that will override any
-        :py:attr:`record_type`:
+        :py:attr:`back_as`:
 
         >>> from psycopg2.extensions import cursor
         >>> db.one( "SELECT * FROM foo WHERE bar='buz'"
-        ...       , record_type=dict
+        ...       , back_as=dict
         ...       , cursor_factory=cursor
         ...        )
         ('buz', 42)
@@ -450,14 +449,14 @@ class Postgres(object):
         so it should work for both mappings and sequences.
 
         >>> db.one( "SELECT sum(baz) FROM foo WHERE bar='nope'"
-        ...       , record_type=dict
+        ...       , back_as=dict
         ...       , default=0
         ...        )
         0
 
         """
 
-        out = self._some(sql, parameters, 0, 1, record_type, *a, **kw)
+        out = self._some(sql, parameters, 0, 1, back_as, *a, **kw)
 
         # dereference
         if out is not None and len(out) == 1:
@@ -471,14 +470,14 @@ class Postgres(object):
         return out
 
 
-    def all(self, sql, parameters=None, record_type=None, *a, **kw):
+    def all(self, sql, parameters=None, back_as=None, *a, **kw):
         """Execute a query and return all results.
 
         :param string sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
         :type parameters: dict or tuple
-        :param record_type: the type of record to return
-        :type record_type: type or string
+        :param back_as: the type of record to return
+        :type back_as: type or string
         :param a: passed through to
             :py:meth:`~postgres.Postgres.get_cursor`
         :param kw: passed through to
@@ -489,13 +488,13 @@ class Postgres(object):
         >>> db.all("SELECT * FROM foo ORDER BY bar")
         [Record(bar='bit', baz=537), Record(bar='buz', baz=42)]
 
-        You can use :py:attr:`record_type` to override the type associated with
-        the default :py:attr:`cursor_factory` for your
+        You can use :py:attr:`back_as` to override the type associated with the
+        default :py:attr:`cursor_factory` for your
         :py:class:`~postgres.Postgres` instance:
 
         >>> db.default_cursor_factory
         <class 'psycopg2.extras.NamedTupleCursor'>
-        >>> db.all("SELECT * FROM foo ORDER BY bar", record_type=dict)
+        >>> db.all("SELECT * FROM foo ORDER BY bar", back_as=dict)
         [{'bar': 'bit', 'baz': 537}, {'bar': 'buz', 'baz': 42}]
 
         That's a convenience so you don't have to go to the trouble of
@@ -503,11 +502,11 @@ class Postgres(object):
         importing it in order to get dictionaries back. If you do need more
         control (maybe you have a custom cursor class), you can pass
         :py:attr:`cursor_factory` explicitly, and that will override any
-        :py:attr:`record_type`:
+        :py:attr:`back_as`:
 
         >>> from psycopg2.extensions import cursor
         >>> db.all( "SELECT * FROM foo ORDER BY bar"
-        ...       , record_type=dict
+        ...       , back_as=dict
         ...       , cursor_factory=cursor
         ...        )
         [('bit', 537), ('buz', 42)]
@@ -522,11 +521,11 @@ class Postgres(object):
         :py:meth:`__len__` and a :py:meth:`values` method) as well those that
         are sequences:
 
-        >>> db.all("SELECT baz FROM foo ORDER BY bar", record_type=dict)
+        >>> db.all("SELECT baz FROM foo ORDER BY bar", back_as=dict)
         [537, 42]
 
         """
-        with self.get_cursor(record_type=record_type, *a, **kw) as cursor:
+        with self.get_cursor(back_as=back_as, *a, **kw) as cursor:
             cursor.execute(sql, parameters)
             recs = cursor.fetchall()
             if recs and len(recs[0]) == 1:          # dereference
@@ -537,14 +536,14 @@ class Postgres(object):
             return recs
 
 
-    def _some(self, sql, parameters, lo, hi, record_type, *a, **kw):
+    def _some(self, sql, parameters, lo, hi, back_as, *a, **kw):
 
         # This is undocumented because I think it's a rare case where this is
         # wanted directly. It was added to make one and one_or_zero DRY when we
         # had those two methods. Help yourself to _some now that you've found
         # it. :^)
 
-        with self.get_cursor(record_type=record_type, *a, **kw) as cursor:
+        with self.get_cursor(back_as=back_as, *a, **kw) as cursor:
             cursor.execute(sql, parameters)
 
             if cursor.rowcount < lo:
@@ -678,7 +677,7 @@ class CursorContextManager(object):
     The return value of :py:func:`CursorContextManager.__enter__` is a
     :py:mod:`psycopg2` cursor. Any positional and keyword arguments to our
     constructor are passed through to the cursor constructor. If you pass
-    :py:attr:`record_type` as a keyword argument then we'll infer a
+    :py:attr:`back_as` as a keyword argument then we'll infer a
     :py:attr:`cursor_factory` from that, though any explicit
     :py:attr:`cursor_factory` keyword argument will take precedence.
 
@@ -722,13 +721,13 @@ class CursorContextManager(object):
 
 
     def compute_cursor_factory(self, **kw):
-        """Pull :py:attr:`record_type` out of :py:attr:`kw` and maybe add
+        """Pull :py:attr:`back_as` out of :py:attr:`kw` and maybe add
         :py:attr:`cursor_factory`.
 
-         Valid values for :py:attr:`record_type` are :py:class:`tuple`,
+         Valid values for :py:attr:`back_as` are :py:class:`tuple`,
          :py:class:`namedtuple`, :py:class:`dict` (or the strings ``tuple``,
          ``namedtuple``, and ``dict``), and :py:class:`None`. If the value of
-         :py:attr:`record_type` is :py:class:`None`, then we won't insert any
+         :py:attr:`back_as` is :py:class:`None`, then we won't insert any
          :py:attr:`cursor_factory` keyword argument. Otherwise we'll specify a
          :py:attr:`cursor_factory` that will result in records of the specific
          type: :py:class:`psycopg2.extensions.cursor` for :py:class:`tuple`,
@@ -738,17 +737,17 @@ class CursorContextManager(object):
 
         """
 
-        # Pull record_type out of kw.
+        # Pull back_as out of kw.
         # ===========================
         # If we leave it in psycopg2 will complain. Our internal calls to
         # get_cursor always have it but external use might not.
 
-        record_type = kw.pop('record_type', None)
+        back_as = kw.pop('back_as', None)
 
 
         if 'cursor_factory' not in kw:
 
-            # Compute cursor_factory from record_type.
+            # Compute cursor_factory from back_as.
             # ====================================
 
             cursor_factory_registry = { tuple: RegularCursor
@@ -760,10 +759,10 @@ class CursorContextManager(object):
                                       , None: None
                                         }
 
-            if record_type not in cursor_factory_registry:
-                raise BadRecordType(record_type)
+            if back_as not in cursor_factory_registry:
+                raise BadRecordType(back_as)
 
-            cursor_factory = cursor_factory_registry[record_type]
+            cursor_factory = cursor_factory_registry[back_as]
             if cursor_factory is not None:
                 kw['cursor_factory'] = cursor_factory
 
