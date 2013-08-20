@@ -157,38 +157,38 @@ class TestOneOrZero(WithData):
         self.assertRaises(TooMany, self.db.one, "SELECT * FROM foo")
 
 
-# db.get_transaction
-# ==================
+# db.get_cursor
+# =============
 
-class TestTransaction(WithData):
+class TestCursor(WithData):
 
-    def test_get_transaction_gets_a_transaction(self):
-        with self.db.get_transaction() as txn:
-            txn.execute("INSERT INTO foo VALUES ('blam')")
-            txn.execute("SELECT * FROM foo ORDER BY bar")
-            actual = txn.fetchall()
+    def test_get_cursor_gets_a_cursor(self):
+        with self.db.get_cursor() as cursor:
+            cursor.execute("INSERT INTO foo VALUES ('blam')")
+            cursor.execute("SELECT * FROM foo ORDER BY bar")
+            actual = cursor.fetchall()
         assert actual == [{"bar": "baz"}, {"bar": "blam"}, {"bar": "buz"}]
 
     def test_transaction_is_isolated(self):
-        with self.db.get_transaction() as txn:
-            txn.execute("INSERT INTO foo VALUES ('blam')")
-            txn.execute("SELECT * FROM foo ORDER BY bar")
+        with self.db.get_cursor() as cursor:
+            cursor.execute("INSERT INTO foo VALUES ('blam')")
+            cursor.execute("SELECT * FROM foo ORDER BY bar")
             actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == ["baz", "buz"]
 
     def test_transaction_commits_on_success(self):
-        with self.db.get_transaction() as txn:
-            txn.execute("INSERT INTO foo VALUES ('blam')")
-            txn.execute("SELECT * FROM foo ORDER BY bar")
+        with self.db.get_cursor() as cursor:
+            cursor.execute("INSERT INTO foo VALUES ('blam')")
+            cursor.execute("SELECT * FROM foo ORDER BY bar")
         actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == ["baz", "blam", "buz"]
 
     def test_transaction_rolls_back_on_failure(self):
         class Heck(Exception): pass
         try:
-            with self.db.get_transaction() as txn:
-                txn.execute("INSERT INTO foo VALUES ('blam')")
-                txn.execute("SELECT * FROM foo ORDER BY bar")
+            with self.db.get_cursor() as cursor:
+                cursor.execute("INSERT INTO foo VALUES ('blam')")
+                cursor.execute("SELECT * FROM foo ORDER BY bar")
                 raise Heck
         except Heck:
             pass
@@ -196,10 +196,10 @@ class TestTransaction(WithData):
         assert actual == ["baz", "buz"]
 
     def test_we_close_the_cursor(self):
-        with self.db.get_transaction() as txn:
-            txn.execute("SELECT * FROM foo ORDER BY bar")
+        with self.db.get_cursor() as cursor:
+            cursor.execute("SELECT * FROM foo ORDER BY bar")
         self.assertRaises( InterfaceError
-                         , txn.fetchall
+                         , cursor.fetchall
                           )
 
 

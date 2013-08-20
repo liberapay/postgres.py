@@ -86,15 +86,15 @@ lower levels of abstraction. The lowest level of abstraction in
 you. Everything in :py:mod:`postgres`, both the simple API and the context
 managers, uses this connection pool.
 
-Use the :py:func:`~postgres.Postgres.get_transaction` context manager to work
+Use the :py:func:`~postgres.Postgres.get_cursor` context manager to work
 directly with a :py:mod:`psycogpg2` `cursor
 <http://initd.org/psycopg/docs/cursor.html>`_ while still taking advantage of
 connection pooling and automatic transaction management:
 
-    >>> with db.get_transaction() as txn:
-    ...     txn.execute("INSERT INTO foo VALUES ('blam')")
-    ...     txn.execute("SELECT * FROM foo ORDER BY bar")
-    ...     txn.fetchall()
+    >>> with db.get_cursor() as cursor:
+    ...     cursor.execute("INSERT INTO foo VALUES ('blam')")
+    ...     cursor.execute("SELECT * FROM foo ORDER BY bar")
+    ...     cursor.fetchall()
     ...
     [Record(bar='bit', baz=537), Record(bar='blam', baz=None), Record(bar='buz', baz=42)]
 
@@ -102,21 +102,22 @@ Note that other calls won't see the changes on your transaction until the end
 of your code block, when the context manager commits the transaction for you::
 
     >>> db.run("DELETE FROM foo WHERE bar='blam'")
-    >>> with db.get_transaction() as txn:
-    ...     txn.execute("INSERT INTO foo VALUES ('blam')")
+    >>> with db.get_cursor() as cursor:
+    ...     cursor.execute("INSERT INTO foo VALUES ('blam')")
     ...     db.all("SELECT * FROM foo ORDER BY bar")
     ...
     [Record(bar='bit', baz=537), Record(bar='buz', baz=42)]
     >>> db.all("SELECT * FROM foo ORDER BY bar")
     [Record(bar='bit', baz=537), Record(bar='blam', baz=None), Record(bar='buz', baz=42)]
 
-The :py:func:`~postgres.Postgres.get_transaction` manager gives you a cursor
-with :py:attr:`autocommit` turned off on its connection. If the block under
-management raises an exception, the connection is rolled back. Otherwise it's
-committed. Use this when you want a series of statements to be part of one
-transaction, but you don't need fine-grained control over the transaction. For
-fine-grained control, use :py:func:`~postgres.Postgres.get_connection` to get a
-connection straight from the connection pool:
+The :py:func:`~postgres.Postgres.get_cursor` method gives you a context manager
+that wraps a cursor. It has :py:attr:`autocommit` turned off on its connection.
+If the block under management raises an exception, the connection is rolled
+back. Otherwise it's committed. Use this when you want a series of statements
+to be part of one transaction, but you don't need fine-grained control over the
+transaction. For fine-grained control, use
+:py:func:`~postgres.Postgres.get_connection` to get a connection straight from
+the connection pool:
 
     >>> db.run("DELETE FROM foo WHERE bar='blam'")
     >>> with db.get_connection() as connection:
@@ -295,7 +296,7 @@ class Postgres(object):
     you set here, you can override that default on a per-call basis by passing
     :py:attr:`record_type` or :py:attr:`cursor_factory` to
     :py:meth:`~postgres.Postgres.one`, :py:meth:`~postgres.Postgres.all`, and
-    :py:meth:`~postgres.Postgres.get_transaction`.
+    :py:meth:`~postgres.Postgres.get_cursor`.
 
     The names in our simple API, :py:meth:`~postgres.Postgres.run`,
     :py:meth:`~postgres.Postgres.one`, and :py:meth:`~postgres.Postgres.all`,
@@ -351,10 +352,8 @@ class Postgres(object):
         :param string sql: the SQL statement to execute
         :param parameters: the bind parameters for the SQL statement
         :type parameters: dict or tuple
-        :param a: passed through to
-            :py:meth:`~postgres.Postgres.get_transaction`
-        :param kw: passed through to
-            :py:meth:`~postgres.Postgres.get_transaction`
+        :param a: passed through to :py:meth:`~postgres.Postgres.get_cursor`
+        :param kw: passed through to :py:meth:`~postgres.Postgres.get_cursor`
         :returns: :py:const:`None`
 
         >>> db.run("DROP TABLE IF EXISTS foo CASCADE")
@@ -363,8 +362,8 @@ class Postgres(object):
         >>> db.run("INSERT INTO foo VALUES ('bit', 537)")
 
         """
-        with self.get_transaction(*a, **kw) as txn:
-            txn.execute(sql, parameters)
+        with self.get_cursor(*a, **kw) as cursor:
+            cursor.execute(sql, parameters)
 
 
     def one(self, sql, parameters=None, record_type=None, default=None, \
@@ -378,9 +377,9 @@ class Postgres(object):
         :type record_type: type or string
         :param default: the value to return if no results are found
         :param a: passed through to
-            :py:meth:`~postgres.Postgres.get_transaction`
+            :py:meth:`~postgres.Postgres.get_cursor`
         :param kw: passed through to
-            :py:meth:`~postgres.Postgres.get_transaction`
+            :py:meth:`~postgres.Postgres.get_cursor`
         :returns: a single record or value or the value of the
             :py:attr:`default` argument
         :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
@@ -481,9 +480,9 @@ class Postgres(object):
         :param record_type: the type of record to return
         :type record_type: type or string
         :param a: passed through to
-            :py:meth:`~postgres.Postgres.get_transaction`
+            :py:meth:`~postgres.Postgres.get_cursor`
         :param kw: passed through to
-            :py:meth:`~postgres.Postgres.get_transaction`
+            :py:meth:`~postgres.Postgres.get_cursor`
         :returns: :py:class:`list` of records or :py:class:`list` of single
             values
 
@@ -527,9 +526,9 @@ class Postgres(object):
         [537, 42]
 
         """
-        with self.get_transaction(record_type=record_type, *a, **kw) as txn:
-            txn.execute(sql, parameters)
-            recs = txn.fetchall()
+        with self.get_cursor(record_type=record_type, *a, **kw) as cursor:
+            cursor.execute(sql, parameters)
+            recs = cursor.fetchall()
             if recs and len(recs[0]) == 1:          # dereference
                 if hasattr(recs[0], 'values'):      # mapping
                     recs = [list(rec.values())[0] for rec in recs]
@@ -545,48 +544,45 @@ class Postgres(object):
         # had those two methods. Help yourself to _some now that you've found
         # it. :^)
 
-        with self.get_transaction(record_type=record_type, *a, **kw) as txn:
-            txn.execute(sql, parameters)
+        with self.get_cursor(record_type=record_type, *a, **kw) as cursor:
+            cursor.execute(sql, parameters)
 
-            if txn.rowcount < lo:
-                raise TooFew(txn.rowcount, lo, hi)
-            elif txn.rowcount > hi:
-                raise TooMany(txn.rowcount, lo, hi)
+            if cursor.rowcount < lo:
+                raise TooFew(cursor.rowcount, lo, hi)
+            elif cursor.rowcount > hi:
+                raise TooMany(cursor.rowcount, lo, hi)
 
-            return txn.fetchone()
+            return cursor.fetchone()
 
 
-    def get_transaction(self, *a, **kw):
-        """Return a :py:class:`~postgres.TransactionContextManager` that uses
+    def get_cursor(self, *a, **kw):
+        """Return a :py:class:`~postgres.CursorContextManager` that uses
         our connection pool.
+
+        >>> with db.get_cursor() as cursor:
+        ...     cursor.execute("SELECT * FROM foo")
+        ...     cursor.fetchall()
+        ...
+        [Record(bar='buz', baz=42), Record(bar='bit', baz=537)]
 
         This gets you a cursor with :py:attr:`autocommit` turned off on its
         connection. If your code block inside the :py:obj:`with` statement
         raises an exception, the transaction will be rolled back. Otherwise,
         it'll be committed. The context manager closes the cursor when the
-        block ends.
+        block ends, resets :py:attr:`autocommit` to off on the connection, and
+        puts the connection back in the pool.
 
         Use this when you want a series of statements to be part of one
         transaction, but you don't need fine-grained control over the
         transaction.
 
-        >>> with db.get_transaction() as txn:
-        ...     txn.execute("SELECT * FROM foo")
-        ...     txn.fetchall()
-        ...
-        [Record(bar='buz', baz=42), Record(bar='bit', baz=537)]
-
         """
-        return TransactionContextManager(self.pool, *a, **kw)
+        return CursorContextManager(self.pool, *a, **kw)
 
 
     def get_connection(self):
         """Return a :py:class:`~postgres.ConnectionContextManager` that uses
         our connection pool.
-
-        Use this when you want to take advantage of connection pooling, but
-        otherwise need full control, for example, to do complex things with
-        transactions.
 
         >>> with db.get_connection() as connection:
         ...     cursor = connection.cursor()
@@ -594,6 +590,10 @@ class Postgres(object):
         ...     cursor.fetchall()
         ...
         [Record(bar='buz', baz=42), Record(bar='bit', baz=537)]
+
+        Use this when you want to take advantage of connection pooling, but
+        otherwise need full control, for example, to do complex things with
+        transactions.
 
         """
         return ConnectionContextManager(self.pool)
@@ -669,13 +669,13 @@ class Postgres(object):
 # Context Managers
 # ================
 
-class TransactionContextManager(object):
-    """Instantiated once per :py:func:`~postgres.Postgres.get_transaction`
+class CursorContextManager(object):
+    """Instantiated once per :py:func:`~postgres.Postgres.get_cursor`
     call.
 
     :param pool: a :py:class:`psycopg2.pool.*ConnectionPool`
 
-    The return value of :py:func:`TransactionContextManager.__enter__` is a
+    The return value of :py:func:`CursorContextManager.__enter__` is a
     :py:mod:`psycopg2` cursor. Any positional and keyword arguments to our
     constructor are passed through to the cursor constructor. If you pass
     :py:attr:`record_type` as a keyword argument then we'll infer a
@@ -741,7 +741,7 @@ class TransactionContextManager(object):
         # Pull record_type out of kw.
         # ===========================
         # If we leave it in psycopg2 will complain. Our internal calls to
-        # get_transaction always have it but external use might not.
+        # get_cursor always have it but external use might not.
 
         record_type = kw.pop('record_type', None)
 
