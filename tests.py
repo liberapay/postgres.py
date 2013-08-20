@@ -45,13 +45,13 @@ class TestRun(WithSchema):
         self.db.run("CREATE TABLE foo (bar text)")
         actual = self.db.all("SELECT tablename FROM pg_tables "
                              "WHERE schemaname='public'")
-        assert actual == [{"tablename": "foo"}]
+        assert actual == ["foo"]
 
     def test_run_inserts(self):
         self.db.run("CREATE TABLE foo (bar text)")
         self.db.run("INSERT INTO foo VALUES ('baz')")
-        actual = len(self.db.one_or_zero("SELECT * FROM foo ORDER BY bar"))
-        assert actual == 1
+        actual = self.db.one_or_zero("SELECT * FROM foo ORDER BY bar")
+        assert actual == "baz"
 
 
 # db.all
@@ -61,11 +61,11 @@ class TestRows(WithData):
 
     def test_rows_fetches_all_rows(self):
         actual = self.db.all("SELECT * FROM foo ORDER BY bar")
-        assert actual == [{"bar": "baz"}, {"bar": "buz"}]
+        assert actual == ["baz", "buz"]
 
     def test_rows_fetches_one_row(self):
         actual = self.db.all("SELECT * FROM foo WHERE bar='baz'")
-        assert actual == [{"bar": "baz"}]
+        assert actual == ["baz"]
 
     def test_rows_fetches_no_rows(self):
         actual = self.db.all("SELECT * FROM foo WHERE bar='blam'")
@@ -74,11 +74,11 @@ class TestRows(WithData):
     def test_bind_parameters_as_dict_work(self):
         params = {"bar": "baz"}
         actual = self.db.all("SELECT * FROM foo WHERE bar=%(bar)s", params)
-        assert actual == [{"bar": "baz"}]
+        assert actual == ["baz"]
 
     def test_bind_parameters_as_tuple_work(self):
         actual = self.db.all("SELECT * FROM foo WHERE bar=%s", ("baz",))
-        assert actual == [{"bar": "baz"}]
+        assert actual == ["baz"]
 
 
 # db.one_or_zero
@@ -88,28 +88,35 @@ class TestWrongNumberException(WithData):
 
     def test_TooFew_message_is_helpful(self):
         try:
-            exc = self.db.one_or_zero("CREATE TABLE foux (baar text)")
+            actual = self.db.one_or_zero("CREATE TABLE foux (baar text)")
         except TooFew as exc:
-            pass
-        actual = str(exc)
+            actual = str(exc)
         assert actual == "Got -1 rows; expecting 0 or 1."
 
     def test_TooMany_message_is_helpful_for_two_options(self):
         try:
-            exc = self.db._some("SELECT * FROM foo", lo=1, hi=1)
+            actual = self.db._some( "SELECT * FROM foo"
+                                  , parameters=None
+                                  , lo=1
+                                  , hi=1
+                                  , record_type=None
+                                   )
         except TooMany as exc:
-            pass
-        actual = str(exc)
+            actual = str(exc)
         assert actual == "Got 2 rows; expecting exactly 1."
 
     def test_TooMany_message_is_helpful_for_a_range(self):
         self.db.run("INSERT INTO foo VALUES ('blam')")
         self.db.run("INSERT INTO foo VALUES ('blim')")
         try:
-            exc = self.db._some("SELECT * FROM foo", lo=1, hi=3)
+            actual = self.db._some( "SELECT * FROM foo"
+                                  , parameters=None
+                                  , lo=1
+                                  , hi=3
+                                  , record_type=None
+                                   )
         except TooMany as exc:
-            pass
-        actual = str(exc)
+            actual = str(exc)
         assert actual == "Got 4 rows; expecting between 1 and 3 (inclusive)."
 
 
@@ -144,7 +151,7 @@ class TestOneOrZero(WithData):
 
     def test_one_or_zero_returns_one(self):
         actual = self.db.one_or_zero("SELECT * FROM foo WHERE bar='baz'")
-        assert actual == {"bar": "baz"}
+        assert actual == "baz"
 
     def test_with_strict_True_one_raises_TooMany(self):
         self.assertRaises(TooMany, self.db.one_or_zero, "SELECT * FROM foo")
@@ -167,14 +174,14 @@ class TestTransaction(WithData):
             txn.execute("INSERT INTO foo VALUES ('blam')")
             txn.execute("SELECT * FROM foo ORDER BY bar")
             actual = self.db.all("SELECT * FROM foo ORDER BY bar")
-        assert actual == [{"bar": "baz"}, {"bar": "buz"}]
+        assert actual == ["baz", "buz"]
 
     def test_transaction_commits_on_success(self):
         with self.db.get_transaction() as txn:
             txn.execute("INSERT INTO foo VALUES ('blam')")
             txn.execute("SELECT * FROM foo ORDER BY bar")
         actual = self.db.all("SELECT * FROM foo ORDER BY bar")
-        assert actual == [{"bar": "baz"}, {"bar": "blam"}, {"bar": "buz"}]
+        assert actual == ["baz", "blam", "buz"]
 
     def test_transaction_rolls_back_on_failure(self):
         class Heck(Exception): pass
@@ -186,7 +193,7 @@ class TestTransaction(WithData):
         except Heck:
             pass
         actual = self.db.all("SELECT * FROM foo ORDER BY bar")
-        assert actual == [{"bar": "baz"}, {"bar": "buz"}]
+        assert actual == ["baz", "buz"]
 
     def test_we_close_the_cursor(self):
         with self.db.get_transaction() as txn:
@@ -218,12 +225,16 @@ class TestCursorFactory(WithData):
         self.db = Postgres(DATABASE_URL)
         self.db.run("DROP SCHEMA IF EXISTS public CASCADE")
         self.db.run("CREATE SCHEMA public")
-        self.db.run("CREATE TABLE foo (bar text)")
-        self.db.run("INSERT INTO foo VALUES ('baz')")
-        self.db.run("INSERT INTO foo VALUES ('buz')")
+        self.db.run("CREATE TABLE foo (bar text, baz int)")
+        self.db.run("INSERT INTO foo VALUES ('buz', 42)")
+        self.db.run("INSERT INTO foo VALUES ('biz', 43)")
 
     def test_NamedDictCursor_results_in_namedtuples(self):
-        Record = namedtuple("Record", ["bar"])
-        expected = [Record(bar="baz"), Record(bar="buz")]
+        Record = namedtuple("Record", ["bar", "baz"])
+        expected = [Record(bar="biz", baz=43), Record(bar="buz", baz=42)]
         actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == expected
+
+    def test_namedtuples_can_be_unrolled(self):
+        actual = self.db.all("SELECT baz FROM foo ORDER BY bar")
+        assert actual == [43, 42]
