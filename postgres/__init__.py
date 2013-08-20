@@ -248,8 +248,9 @@ class NotRegistered(Exception):
 
 class BadRecordType(Exception):
     def __str__(self):
-        return "Bad record_type: {}. Available record_types are: tuple, namedtuple, " \
-               "dict, or None to use the default.".format(self.args[0])
+        return "Bad record_type: {}. Available record_types are: tuple, " \
+               "namedtuple, dict, or None (to use the default)." \
+               .format(self.args[0])
 
 
 # The Main Event
