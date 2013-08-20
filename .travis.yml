@@ -8,7 +8,11 @@ install:
   - pip install --use-mirrors pytest ./
 before_script:
   - psql -U postgres -c 'CREATE DATABASE "test";'
-script: DATABASE_URL=postgres://postgres@localhost/test py.test tests.py -v
+  - psql -U postgres -c 'CREATE USER jrandom SUPERUSER;'
+script: 
+  - DATABASE_URL=postgres://jrandom@localhost/test py.test tests.py -v
+  - DATABASE_URL=postgres://jrandom@localhost/test py.test tests.py -v
+  - DATABASE_URL=postgres://jrandom@localhost/test py.test tests.py -v
 notifications:
   email: false
   irc: 

@@ -145,7 +145,7 @@ class TestOneOrZero(WithData):
     def test_one_returns_whatever(self):
         class WHEEEE: pass
         actual = self.db.one( "SELECT * FROM foo WHERE bar='blam'"
-                            , zero=WHEEEE
+                            , default=WHEEEE
                              )
         assert actual is WHEEEE
 

@@ -367,7 +367,7 @@ class Postgres(object):
             txn.execute(sql, parameters)
 
 
-    def one(self, sql, parameters=None, record_type=None, zero=None, \
+    def one(self, sql, parameters=None, record_type=None, default=None, \
                                                                      *a, **kw):
         """Execute a query and return a single result or a default value.
 
@@ -376,13 +376,13 @@ class Postgres(object):
         :type parameters: dict or tuple
         :param record_type: the type of record to return
         :type record_type: type or string
-        :param zero: the value to return if zero results are found
+        :param default: the value to return if no results are found
         :param a: passed through to
             :py:meth:`~postgres.Postgres.get_transaction`
         :param kw: passed through to
             :py:meth:`~postgres.Postgres.get_transaction`
-        :returns: a single record or value or the value of the :py:attr:`zero`
-            argument
+        :returns: a single record or value or the value of the
+            :py:attr:`default` argument
         :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
 
         Use this for the common case where there should only be one record, but
@@ -399,16 +399,16 @@ class Postgres(object):
         ...
         No blam yet.
 
-        If you pass :py:attr:`zero` we'll return that instead of
+        If you pass :py:attr:`default` we'll return that instead of
         :py:class:`None`:
 
-        >>> db.one("SELECT * FROM foo WHERE bar='blam'", zero=False)
+        >>> db.one("SELECT * FROM foo WHERE bar='blam'", default=False)
         False
 
         We specifically don't support passing lambdas or other callables for
-        the :py:attr:`zero` parameter. That gets complicated quickly, and it's
-        easy to just check the return value in the caller and do your extra
-        logic there.
+        the :py:attr:`default` parameter. That gets complicated quickly, and
+        it's easy to just check the return value in the caller and do your
+        extra logic there.
 
         You can use :py:attr:`record_type` to override the type associated with
         the default :py:attr:`cursor_factory` for your
@@ -442,9 +442,9 @@ class Postgres(object):
         42
 
         And if the dereferenced value is :py:class:`None`, we return the value
-        of :py:attr:`zero`:
+        of :py:attr:`default`:
 
-        >>> db.one("SELECT sum(baz) FROM foo WHERE bar='nope'", zero=0)
+        >>> db.one("SELECT sum(baz) FROM foo WHERE bar='nope'", default=0)
         0
 
         Dereferencing will use :py:meth:`.values` if it exists on the record,
@@ -452,7 +452,7 @@ class Postgres(object):
 
         >>> db.one( "SELECT sum(baz) FROM foo WHERE bar='nope'"
         ...       , record_type=dict
-        ...       , zero=0
+        ...       , default=0
         ...        )
         0
 
@@ -465,9 +465,9 @@ class Postgres(object):
             seq = list(out.values()) if hasattr(out, 'values') else out
             out = seq[0]
 
-        # zero
+        # default
         if out is None:
-            out = zero
+            out = default
 
         return out
 
