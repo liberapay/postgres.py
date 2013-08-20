@@ -50,7 +50,7 @@ class TestRun(WithSchema):
     def test_run_inserts(self):
         self.db.run("CREATE TABLE foo (bar text)")
         self.db.run("INSERT INTO foo VALUES ('baz')")
-        actual = self.db.one_or_zero("SELECT * FROM foo ORDER BY bar")
+        actual = self.db.one("SELECT * FROM foo ORDER BY bar")
         assert actual == "baz"
 
 
@@ -81,14 +81,14 @@ class TestRows(WithData):
         assert actual == ["baz"]
 
 
-# db.one_or_zero
-# ==============
+# db.one
+# ======
 
 class TestWrongNumberException(WithData):
 
     def test_TooFew_message_is_helpful(self):
         try:
-            actual = self.db.one_or_zero("CREATE TABLE foux (baar text)")
+            actual = self.db.one("CREATE TABLE foux (baar text)")
         except TooFew as exc:
             actual = str(exc)
         assert actual == "Got -1 rows; expecting 0 or 1."
@@ -122,15 +122,15 @@ class TestWrongNumberException(WithData):
 
 class TestOneOrZero(WithData):
 
-    def test_one_or_zero_raises_TooFew(self):
+    def test_one_raises_TooFew(self):
         self.assertRaises( TooFew
-                         , self.db.one_or_zero
+                         , self.db.one
                          , "CREATE TABLE foux (baar text)"
                           )
 
-    def test_one_or_zero_rollsback_on_error(self):
+    def test_one_rollsback_on_error(self):
         try:
-            self.db.one_or_zero("CREATE TABLE foux (baar text)")
+            self.db.one("CREATE TABLE foux (baar text)")
         except TooFew:
             pass
         self.assertRaises( ProgrammingError
@@ -138,23 +138,23 @@ class TestOneOrZero(WithData):
                          , "SELECT * FROM foux"
                           )
 
-    def test_one_or_zero_returns_None(self):
-        actual = self.db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
+    def test_one_returns_None(self):
+        actual = self.db.one("SELECT * FROM foo WHERE bar='blam'")
         assert actual is None
 
-    def test_one_or_zero_returns_whatever(self):
+    def test_one_returns_whatever(self):
         class WHEEEE: pass
-        actual = self.db.one_or_zero( "SELECT * FROM foo WHERE bar='blam'"
-                                    , zero=WHEEEE
-                                     )
+        actual = self.db.one( "SELECT * FROM foo WHERE bar='blam'"
+                            , zero=WHEEEE
+                             )
         assert actual is WHEEEE
 
-    def test_one_or_zero_returns_one(self):
-        actual = self.db.one_or_zero("SELECT * FROM foo WHERE bar='baz'")
+    def test_one_returns_one(self):
+        actual = self.db.one("SELECT * FROM foo WHERE bar='baz'")
         assert actual == "baz"
 
     def test_with_strict_True_one_raises_TooMany(self):
-        self.assertRaises(TooMany, self.db.one_or_zero, "SELECT * FROM foo")
+        self.assertRaises(TooMany, self.db.one, "SELECT * FROM foo")
 
 
 # db.get_transaction

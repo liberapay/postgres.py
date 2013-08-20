@@ -32,22 +32,22 @@ Use :py:meth:`~postgres.Postgres.run` to run SQL statements:
     >>> db.run("INSERT INTO foo VALUES ('buz', 42)")
     >>> db.run("INSERT INTO foo VALUES ('bit', 537)")
 
+Use :py:meth:`~postgres.Postgres.one` to run SQL and fetch one result or
+:py:class:`None`:
+
+    >>> db.one("SELECT * FROM foo WHERE bar='buz'")
+    Record(bar='buz', baz=42)
+    >>> db.one("SELECT * FROM foo WHERE bar='blam'")
+
 Use :py:meth:`~postgres.Postgres.all` to run SQL and fetch all results:
 
     >>> db.all("SELECT * FROM foo ORDER BY bar")
     [Record(bar='bit', baz=537), Record(bar='buz', baz=42)]
 
-Use :py:meth:`~postgres.Postgres.one_or_zero` to run SQL and fetch one result
-or :py:class:`None`:
-
-    >>> db.one_or_zero("SELECT * FROM foo WHERE bar='buz'")
-    Record(bar='buz', baz=42)
-    >>> db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
-
 If your queries return one column then you get just the value or a list of
 values instead of a record or list of records:
 
-    >>> db.one_or_zero("SELECT baz FROM foo WHERE bar='buz'")
+    >>> db.one("SELECT baz FROM foo WHERE bar='buz'")
     42
     >>> db.all("SELECT baz FROM foo ORDER BY bar")
     [537, 42]
@@ -65,7 +65,7 @@ an implementation of DB-API 2.0) will bind to the query in a way that is safe
 against `SQL injection`_. (This is inspired by old-style Python string
 formatting, but it is not the same.)
 
-    >>> db.one_or_zero("SELECT * FROM foo WHERE bar=%(bar)s", {"bar": "buz"})
+    >>> db.one("SELECT * FROM foo WHERE bar=%(bar)s", {"bar": "buz"})
     Record(bar='buz', baz=42)
 
 Never build SQL strings out of user input!
@@ -77,10 +77,10 @@ Context Managers
 ++++++++++++++++
 
 Eighty percent of your database usage should be covered by the simple
-:py:meth:`~postgres.Postgres.run`, :py:meth:`~postgres.Postgres.all`,
-:py:meth:`~postgres.Postgres.one_or_zero` API introduced above. For the other
-20%, :py:mod:`postgres` provides two context managers for working at
-increasingly lower levels of abstraction. The lowest level of abstraction in
+:py:meth:`~postgres.Postgres.run`, :py:meth:`~postgres.Postgres.one`,
+:py:meth:`~postgres.Postgres.all` API introduced above. For the other 20%,
+:py:mod:`postgres` provides two context managers for working at increasingly
+lower levels of abstraction. The lowest level of abstraction in
 :py:mod:`postgres` is a :py:mod:`psycopg2` `connection pool
 <http://initd.org/psycopg/docs/pool.html>`_ that we configure and manage for
 you. Everything in :py:mod:`postgres`, both the simple API and the context
@@ -294,27 +294,28 @@ class Postgres(object):
     :py:mod:`psycopg2` behavior, which is to return tuples. Whatever default
     you set here, you can override that default on a per-call basis by passing
     :py:attr:`record_type` or :py:attr:`cursor_factory` to
-    :py:meth:`~postgres.Postgres.all`,
-    :py:meth:`~postgres.Postgres.one_or_zero`, and
+    :py:meth:`~postgres.Postgres.one`, :py:meth:`~postgres.Postgres.all`, and
     :py:meth:`~postgres.Postgres.get_transaction`.
 
     The names in our simple API, :py:meth:`~postgres.Postgres.run`,
-    :py:meth:`~postgres.Postgres.all`, and
-    :py:meth:`~postgres.Postgres.one_or_zero`, were chosen to be short and
-    memorable, and to not conflict with the DB-API 2.0 :py:meth:`execute`,
-    :py:meth:`fetchall`, and :py:meth:`fetchone` methods, which have slightly
-    different semantics (under DB-API 2.0 you call :py:meth:`execute` on a
-    cursor and then call one of the :py:meth:`fetch*` methods on the same
-    cursor to retrieve records; with our simple API there is no second
-    :py:meth:`fetch` step). See `this ticket`_ for more of the rationale behind
-    these names. The context managers on this class are named starting with
-    :py:meth:`get_` to set them apart from the simple-case API.  Note that when
-    working inside a block under one of the context managers, you're using
-    DB-API 2.0 (:py:meth:`execute` + :py:meth:`fetch*`), not our simple API
-    (:py:meth:`~postgres.Postgres.run`, :py:meth:`~postgres.Postgres.all`,
-    :py:meth:`~postgres.Postgres.one_or_zero`).
+    :py:meth:`~postgres.Postgres.one`, and :py:meth:`~postgres.Postgres.all`,
+    were chosen to be short and memorable, and to not directly conflict with
+    the DB-API 2.0 :py:meth:`execute`, :py:meth:`fetchone`, and
+    :py:meth:`fetchall` methods, which have slightly different semantics (under
+    DB-API 2.0 you call :py:meth:`execute` on a cursor and then call one of the
+    :py:meth:`fetch*` methods on the same cursor to retrieve records; with our
+    simple API there is no second :py:meth:`fetch` step, and we also provide
+    automatic dereferencing). See issues `16`_ and `20`_ for more of the
+    rationale behind these names. The context managers on this class are named
+    starting with :py:meth:`get_` to set them apart from the simple-case API.
+    Note that when working inside a block under one of the context managers,
+    you're using DB-API 2.0 (:py:meth:`execute` + :py:meth:`fetch*`, with no
+    automatic dereferencing), not our simple API
+    (:py:meth:`~postgres.Postgres.run`, :py:meth:`~postgres.Postgres.one`,
+    :py:meth:`~postgres.Postgres.all`).
 
-    .. _this ticket: https://github.com/gittip/postgres.py/issues/16
+    .. _16: https://github.com/gittip/postgres.py/issues/16
+    .. _20: https://github.com/gittip/postgres.py/issues/20
 
     """
 
@@ -364,6 +365,111 @@ class Postgres(object):
         """
         with self.get_transaction(*a, **kw) as txn:
             txn.execute(sql, parameters)
+
+
+    def one(self, sql, parameters=None, record_type=None, zero=None, \
+                                                                     *a, **kw):
+        """Execute a query and return a single result or a default value.
+
+        :param string sql: the SQL statement to execute
+        :param parameters: the bind parameters for the SQL statement
+        :type parameters: dict or tuple
+        :param record_type: the type of record to return
+        :type record_type: type or string
+        :param zero: the value to return if zero results are found
+        :param a: passed through to
+            :py:meth:`~postgres.Postgres.get_transaction`
+        :param kw: passed through to
+            :py:meth:`~postgres.Postgres.get_transaction`
+        :returns: a single record or value or the value of the :py:attr:`zero`
+            argument
+        :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
+
+        Use this for the common case where there should only be one record, but
+        it may not exist yet.
+
+        >>> db.one("SELECT * FROM foo WHERE bar='buz'")
+        Record(bar='buz', baz=42)
+
+        If the record doesn't exist, we return :py:class:`None`:
+
+        >>> record = db.one("SELECT * FROM foo WHERE bar='blam'")
+        >>> if record is None:
+        ...     print("No blam yet.")
+        ...
+        No blam yet.
+
+        If you pass :py:attr:`zero` we'll return that instead of
+        :py:class:`None`:
+
+        >>> db.one("SELECT * FROM foo WHERE bar='blam'", zero=False)
+        False
+
+        We specifically don't support passing lambdas or other callables for
+        the :py:attr:`zero` parameter. That gets complicated quickly, and it's
+        easy to just check the return value in the caller and do your extra
+        logic there.
+
+        You can use :py:attr:`record_type` to override the type associated with
+        the default :py:attr:`cursor_factory` for your
+        :py:class:`~postgres.Postgres` instance:
+
+        >>> db.default_cursor_factory
+        <class 'psycopg2.extras.NamedTupleCursor'>
+        >>> db.one( "SELECT * FROM foo WHERE bar='buz'"
+        ...       , record_type=dict
+        ...        )
+        {'bar': 'buz', 'baz': 42}
+
+        That's a convenience so you don't have to go to the trouble of
+        remembering where :py:class:`~psycopg2.extras.RealDictCursor` lives and
+        importing it in order to get dictionaries back. If you do need more
+        control (maybe you have a custom cursor class), you can pass
+        :py:attr:`cursor_factory` explicitly, and that will override any
+        :py:attr:`record_type`:
+
+        >>> from psycopg2.extensions import cursor
+        >>> db.one( "SELECT * FROM foo WHERE bar='buz'"
+        ...       , record_type=dict
+        ...       , cursor_factory=cursor
+        ...        )
+        ('buz', 42)
+
+        If the query result has only one column, then we dereference that for
+        you.
+
+        >>> db.one("SELECT baz FROM foo WHERE bar='buz'")
+        42
+
+        And if the dereferenced value is :py:class:`None`, we return the value
+        of :py:attr:`zero`:
+
+        >>> db.one("SELECT sum(baz) FROM foo WHERE bar='nope'", zero=0)
+        0
+
+        Dereferencing will use :py:meth:`.values` if it exists on the record,
+        so it should work for both mappings and sequences.
+
+        >>> db.one( "SELECT sum(baz) FROM foo WHERE bar='nope'"
+        ...       , record_type=dict
+        ...       , zero=0
+        ...        )
+        0
+
+        """
+
+        out = self._some(sql, parameters, 0, 1, record_type, *a, **kw)
+
+        # dereference
+        if out is not None and len(out) == 1:
+            seq = list(out.values()) if hasattr(out, 'values') else out
+            out = seq[0]
+
+        # zero
+        if out is None:
+            out = zero
+
+        return out
 
 
     def all(self, sql, parameters=None, record_type=None, *a, **kw):
@@ -432,117 +538,12 @@ class Postgres(object):
             return recs
 
 
-    def one_or_zero(self, sql, parameters=None, record_type=None, zero=None, \
-                                                                     *a, **kw):
-        """Execute a query and return a single result or a default value.
-
-        :param string sql: the SQL statement to execute
-        :param parameters: the bind parameters for the SQL statement
-        :type parameters: dict or tuple
-        :param record_type: the type of record to return
-        :type record_type: type or string
-        :param zero: the value to return if zero results are found
-        :param a: passed through to
-            :py:meth:`~postgres.Postgres.get_transaction`
-        :param kw: passed through to
-            :py:meth:`~postgres.Postgres.get_transaction`
-        :returns: a single record or value or the value of the :py:attr:`zero`
-            argument
-        :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
-
-        Use this for the common case where there should only be one record, but
-        it may not exist yet.
-
-        >>> db.one_or_zero("SELECT * FROM foo WHERE bar='buz'")
-        Record(bar='buz', baz=42)
-
-        If the record doesn't exist, we return :py:class:`None`:
-
-        >>> record = db.one_or_zero("SELECT * FROM foo WHERE bar='blam'")
-        >>> if record is None:
-        ...     print("No blam yet.")
-        ...
-        No blam yet.
-
-        If you pass :py:attr:`zero` we'll return that instead of
-        :py:class:`None`:
-
-        >>> db.one_or_zero("SELECT * FROM foo WHERE bar='blam'", zero=False)
-        False
-
-        We specifically don't support passing lambdas or other callables for
-        the :py:attr:`zero` parameter. That gets complicated quickly, and it's
-        easy to just check the return value in the caller and do your extra
-        logic there.
-
-        You can use :py:attr:`record_type` to override the type associated with
-        the default :py:attr:`cursor_factory` for your
-        :py:class:`~postgres.Postgres` instance:
-
-        >>> db.default_cursor_factory
-        <class 'psycopg2.extras.NamedTupleCursor'>
-        >>> db.one_or_zero( "SELECT * FROM foo WHERE bar='buz'"
-        ...               , record_type=dict
-        ...                )
-        {'bar': 'buz', 'baz': 42}
-
-        That's a convenience so you don't have to go to the trouble of
-        remembering where :py:class:`~psycopg2.extras.RealDictCursor` lives and
-        importing it in order to get dictionaries back. If you do need more
-        control (maybe you have a custom cursor class), you can pass
-        :py:attr:`cursor_factory` explicitly, and that will override any
-        :py:attr:`record_type`:
-
-        >>> from psycopg2.extensions import cursor
-        >>> db.one_or_zero( "SELECT * FROM foo WHERE bar='buz'"
-        ...               , record_type=dict
-        ...               , cursor_factory=cursor
-        ...                )
-        ('buz', 42)
-
-        If the query result has only one column, then we dereference that for
-        you.
-
-        >>> db.one_or_zero("SELECT baz FROM foo WHERE bar='buz'")
-        42
-
-        And if the dereferenced value is :py:class:`None`, we return the value
-        of :py:attr:`zero`:
-
-        >>> db.one_or_zero("SELECT sum(baz) FROM foo WHERE bar='nope'", zero=0)
-        0
-
-        Dereferencing will use :py:meth:`.values` if it exists on the record,
-        so it should work for both mappings and sequences.
-
-        >>> db.one_or_zero( "SELECT sum(baz) FROM foo WHERE bar='nope'"
-        ...               , record_type=dict
-        ...               , zero=0
-        ...                )
-        0
-
-        """
-
-        out = self._some(sql, parameters, 0, 1, record_type, *a, **kw)
-
-        # dereference
-        if out is not None and len(out) == 1:
-            seq = list(out.values()) if hasattr(out, 'values') else out
-            out = seq[0]
-
-        # zero
-        if out is None:
-            out = zero
-
-        return out
-
-
     def _some(self, sql, parameters, lo, hi, record_type, *a, **kw):
 
-        # This is undocumented (and largely untested) because I think it's a
-        # rare case where this is wanted directly. It was added to make one and
-        # one_or_zero DRY when we had one. Help yourself to it now that you've
-        # found it. :^)
+        # This is undocumented because I think it's a rare case where this is
+        # wanted directly. It was added to make one and one_or_zero DRY when we
+        # had those two methods. Help yourself to _some now that you've found
+        # it. :^)
 
         with self.get_transaction(record_type=record_type, *a, **kw) as txn:
             txn.execute(sql, parameters)
@@ -620,9 +621,9 @@ class Postgres(object):
         if getattr(ModelSubclass, 'typname', None) is None:
             raise NoTypeSpecified(ModelSubclass)
 
-        n = self.one_or_zero( "SELECT count(*) FROM pg_type WHERE typname=%s"
-                            , (ModelSubclass.typname,)
-                             )
+        n = self.one( "SELECT count(*) FROM pg_type WHERE typname=%s"
+                    , (ModelSubclass.typname,)
+                     )
         if n < 1:
             # Could be more than one since we don't constrain by typnamespace.
             # XXX What happens then?

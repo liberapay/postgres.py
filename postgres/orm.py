@@ -111,28 +111,28 @@ Second, register your model with your :py:class:`~postgres.Postgres` instance:
 
 That will plug your model into the :py:mod:`psycopg2` composite casting
 machinery, and you'll now get instances of your model back from
-:py:meth:`~postgres.Postgres.all` and :py:meth:`~postgres.Postgres.one_or_zero`
-when you cast to the relevant type in your query. If your query returns more
-than one column, you'll need to dereference the column containing the model
-just as with any other query:
+:py:meth:`~postgres.Postgres.one` and :py:meth:`~postgres.Postgres.all` when
+you cast to the relevant type in your query. If your query returns more than
+one column, you'll need to dereference the column containing the model just as
+with any other query:
 
-    >>> rec = db.one_or_zero("SELECT foo.*::foo, bar.* "
-    ...                      "FROM foo JOIN bar ON foo.bar = bar.bar "
-    ...                      "ORDER BY foo.bar LIMIT 1")
+    >>> rec = db.one("SELECT foo.*::foo, bar.* "
+    ...              "FROM foo JOIN bar ON foo.bar = bar.bar "
+    ...              "ORDER BY foo.bar LIMIT 1")
     >>> rec.foo.bar
     'blam'
     >>> rec.bar
     'blam'
 
 And as usual, if your query only returns one column, then
-:py:meth:`~postgres.Postgres.all` and :py:meth:`~postgres.Postgres.one_or_zero`
+:py:meth:`~postgres.Postgres.one` and :py:meth:`~postgres.Postgres.all`
 will do the dereferencing for you:
 
-    >>> [foo.bar for foo in db.all("SELECT foo.*::foo FROM foo")]
-    ['blam', 'whit']
-    >>> foo = db.one_or_zero("SELECT foo.*::foo FROM foo WHERE bar='blam'")
+    >>> foo = db.one("SELECT foo.*::foo FROM foo WHERE bar='blam'")
     >>> foo.bar
     'blam'
+    >>> [foo.bar for foo in db.all("SELECT foo.*::foo FROM foo")]
+    ['blam', 'whit']
 
 To update your database, add a method to your model:
 
@@ -151,13 +151,13 @@ To update your database, add a method to your model:
 
 Then use that method to update the database:
 
-    >>> db.one_or_zero("SELECT baz FROM foo WHERE bar='blam'")
-    >>> foo = db.one_or_zero("SELECT foo.*::foo FROM foo WHERE bar='blam'")
+    >>> db.one("SELECT baz FROM foo WHERE bar='blam'")
     42
+    >>> foo = db.one("SELECT foo.*::foo FROM foo WHERE bar='blam'")
     >>> foo.set_baz(90210)
     >>> foo.baz
     90210
-    >>> db.one_or_zero("SELECT baz FROM foo WHERE bar='blam'")
+    >>> db.one("SELECT baz FROM foo WHERE bar='blam'")
     90210
 
 We never update your database for you. We also never sync your objects for you:
@@ -258,6 +258,7 @@ class Model(object):
 
 
 if __name__ == '__main__':
+
     from postgres import Postgres
     db = Postgres("postgres://jrandom@localhost/test")
     db.run("DROP TABLE IF EXISTS foo CASCADE")
