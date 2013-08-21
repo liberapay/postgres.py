@@ -216,6 +216,41 @@ class TestConnection(WithData):
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
 
 
+# orm
+# ===
+
+class TestORM(WithData):
+
+    from postgres.orm import Model
+
+    class MyModel(Model):
+
+        typname = "foo"
+
+        def update_bar(self, bar):
+            self.db.run( "UPDATE foo SET bar=%s WHERE bar=%s"
+                       , (bar, self.bar)
+                        )
+            self.update_attributes(bar=bar)
+
+    def setUp(self):
+        WithData.setUp(self)
+        self.db.register_model(self.MyModel)
+
+    def tearDown(self):
+        self.db.model_registry = {}
+
+    def test_orm_basically_works(self):
+        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        assert one.__class__ == self.MyModel
+
+    def test_updating_attributes_works(self):
+        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        one.update_bar("blah")
+        bar = self.db.one("SELECT bar FROM foo WHERE bar='blah'")
+        assert bar == one.bar
+
+
 # cursor_factory
 # ==============
 
