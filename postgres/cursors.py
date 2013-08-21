@@ -167,7 +167,7 @@ class SimpleDictCursor(RealDictCursor, SimpleCursorBase):
 
 def isexception(obj):
     """Given an object, return a boolean indicating whether it is an instance
-    or subclass of Exception.
+    or subclass of :py:class:`Exception`.
     """
     if isinstance(obj, Exception):
         return True
