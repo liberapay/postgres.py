@@ -165,12 +165,13 @@ try:                    # Python 2
 
 except ImportError:     # Python 3
     import urllib.parse as urlparse
+from collections import namedtuple
 
 import psycopg2
 from postgres.context_managers import ConnectionContextManager
 from postgres.context_managers import CursorContextManager
-from postgres.context_managers import handle_back_as
-from postgres.cursors import SimpleNamedTupleCursor, SimpleCursorBase
+from postgres.cursors import SimpleTupleCursor, SimpleNamedTupleCursor
+from postgres.cursors import SimpleDictCursor, SimpleCursorBase
 from postgres.orm import Model
 from psycopg2.extras import register_composite, CompositeCaster
 from psycopg2.pool import ThreadedConnectionPool as ConnectionPool
@@ -235,6 +236,12 @@ class AlreadyRegistered(Exception):
 class NotRegistered(Exception):
     def __str__(self):
         return "The model {} is not registered.".format(self.args[0].__name__)
+
+class BadBackAs(Exception):
+    def __str__(self):
+        return "Bad back_as: {}. Available back_as values are: tuple, " \
+               "namedtuple, dict, or None (to use the default)." \
+               .format(self.args[0])
 
 
 # The Main Event
@@ -522,9 +529,14 @@ class Postgres(object):
             return cursor.all(sql, parameters)
 
 
-    def get_cursor(self, back_as=None, *a, **kw):
+    def get_cursor(self, *a, **kw):
         """Return a :py:class:`~postgres.CursorContextManager` that uses
         our connection pool.
+
+        :param a: passed through to the :py:meth:`cursor` method of instances
+            of the class returned by :py:func:`~postgres.make_Connection`
+        :param kw: passed through to the :py:meth:`cursor` method of instances
+            of the class returned by :py:func:`~postgres.make_Connection`
 
         >>> with db.get_cursor() as cursor:
         ...     cursor.all("SELECT * FROM foo")
@@ -554,7 +566,7 @@ class Postgres(object):
         transaction.
 
         """
-        return CursorContextManager(self.pool, back_as=back_as, *a, **kw)
+        return CursorContextManager(self.pool, *a, **kw)
 
 
     def get_connection(self):
@@ -680,14 +692,26 @@ def make_Connection(postgres):
     :returns: a :py:class:`Connection` class
 
     The class defined and returned here will be linked to the instance of
-    :py:class:`~postgres.Postgres` that is passed in as :py:attr:`postgres` and
-    will use the :py:attr:`default_cursor_factory` attribute of that object.
-    The :py:class:`~postgres.Postgres` instance will use this class as the
-    :py:attr:`connection_factory` for its connection pool. The
-    :py:meth:`cursor` method of this class accepts a :py:attr:`back_as`
-    argument, which is processed according to
-    :py:func:`~postgres.handle_back_as`. We also set client encoding to
-    ``UTF-8``.
+    :py:class:`~postgres.Postgres` that is passed in as :py:attr:`postgres`,
+    which will use this class as the :py:attr:`connection_factory` for its
+    connection pool.
+
+    The :py:meth:`cursor` method of this class accepts a :py:attr:`back_as`
+    keyword argument. If a :py:attr:`cursor_factory` keyword argument is also
+    given, then any :py:attr:`back_as` is ignored and discarded.  Valid values
+    for :py:attr:`back_as` are :py:class:`tuple`, :py:class:`namedtuple`,
+    :py:class:`dict` (or the strings ``tuple``, ``namedtuple``, and ``dict``),
+    and :py:class:`None`. If the value of :py:attr:`back_as` is
+    :py:class:`None`, then we'll use the default :py:attr:`cursor_factory` with
+    which our parent :py:class:`~postgres.Postgres` instance was instantiated.
+    If :py:attr:`back_as` is not :py:class:`None`, then we'll specify a
+    :py:attr:`cursor_factory` that will result in records of the designated
+    type: :py:class:`postgres.cursor.SimpleTupleCursor` for :py:class:`tuple`,
+    :py:class:`postgres.cursor.SimpleNamedTupleCursor` for
+    :py:class:`namedtuple`, and :py:class:`postgres.cursor.SimpleDictCursor`
+    for :py:class:`dict`.
+
+    We also set client encoding to ``UTF-8``.
 
     """
     class Connection(psycopg2.extensions.connection):
@@ -700,10 +724,35 @@ def make_Connection(postgres):
         def cursor(self, *a, **kw):
             if 'back_as' in kw:
                 back_as = kw.pop('back_as')
-                kw = handle_back_as(back_as, **kw)
+                kw = self.handle_back_as(back_as, **kw)
             if 'cursor_factory' not in kw:
                 kw['cursor_factory'] = self.postgres.default_cursor_factory
             return psycopg2.extensions.connection.cursor(self, *a, **kw)
+
+        def handle_back_as(self, back_as, **kw):
+
+            if 'cursor_factory' not in kw:
+
+                # Compute cursor_factory from back_as.
+                # ====================================
+
+                registry = { tuple: SimpleTupleCursor
+                           , 'tuple': SimpleTupleCursor
+                           , namedtuple: SimpleNamedTupleCursor
+                           , 'namedtuple': SimpleNamedTupleCursor
+                           , dict: SimpleDictCursor
+                           , 'dict': SimpleDictCursor
+                           , None: None
+                             }
+
+                if back_as not in registry:
+                    raise BadBackAs(back_as)
+
+                cursor_factory = registry[back_as]
+                if cursor_factory is not None:
+                    kw['cursor_factory'] = cursor_factory
+
+            return kw
 
     return Connection
 

@@ -9,7 +9,7 @@ from __future__ import print_function, unicode_literals
 
 from inspect import isclass
 
-from psycopg2.extensions import cursor as RegularCursor
+from psycopg2.extensions import cursor as TupleCursor
 from psycopg2.extras import NamedTupleCursor, RealDictCursor
 
 
@@ -49,7 +49,7 @@ class SimpleCursorBase(object):
     :py:class:`~postgres.Postgres` must subclass this base.
 
     >>> from psycopg2.extras import LoggingCursor
-    >>> from postgres.cursor import SimpleCursorBase
+    >>> from postgres.cursors import SimpleCursorBase
     >>> class SimpleLoggingCursor(LoggingCursor, SimpleCursorBase):
     ...     pass
     ...
@@ -59,7 +59,7 @@ class SimpleCursorBase(object):
     ...               )
 
     If you try to use a cursor that doesn't subclass
-    :py:class:`~postgres.cursor.SimpleCursorBase` as the default
+    :py:class:`~postgres.cursors.SimpleCursorBase` as the default
     :py:attr:`cursor_factory` for a :py:class:`~postgres.Postgres` instance, we
     won't let you:
 
@@ -69,7 +69,7 @@ class SimpleCursorBase(object):
     ...
     Traceback (most recent call last):
         ...
-    postgres.NotASimpleCursor: We can only work with subclasses of postgres.cursor.SimpleCursorBase. LoggingCursor doesn't fit the bill.
+    postgres.NotASimpleCursor: We can only work with subclasses of postgres.cursors.SimpleCursorBase. LoggingCursor doesn't fit the bill.
 
     However, we do allow you to use whatever you want as the
     :py:attr:`cursor_factory` argument for individual calls:
@@ -152,7 +152,7 @@ class SimpleCursorBase(object):
         return recs
 
 
-class SimpleTupleCursor(RegularCursor, SimpleCursorBase):
+class SimpleTupleCursor(TupleCursor, SimpleCursorBase):
     """A simple cursor that returns tuples.
     """
 
