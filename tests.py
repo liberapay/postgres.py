@@ -1,12 +1,12 @@
-from __future__ import unicode_literals
+from __future__ import print_function, unicode_literals
 
 import os
 from collections import namedtuple
 from unittest import TestCase
 
-from postgres import Postgres, TooFew, TooMany
+from postgres import Postgres
+from postgres.cursors import TooFew, TooMany, SimpleDictCursor
 from postgres.orm import ReadOnly
-from psycopg2.extras import RealDictCursor
 from psycopg2 import InterfaceError, ProgrammingError
 
 
@@ -19,7 +19,7 @@ DATABASE_URL = os.environ['DATABASE_URL']
 class WithSchema(TestCase):
 
     def setUp(self):
-        self.db = Postgres(DATABASE_URL, cursor_factory=RealDictCursor)
+        self.db = Postgres(DATABASE_URL, cursor_factory=SimpleDictCursor)
         self.db.run("DROP SCHEMA IF EXISTS public CASCADE")
         self.db.run("CREATE SCHEMA public")
 
@@ -96,12 +96,12 @@ class TestWrongNumberException(WithData):
 
     def test_TooMany_message_is_helpful_for_two_options(self):
         try:
-            actual = self.db._some( "SELECT * FROM foo"
-                                  , parameters=None
-                                  , lo=1
-                                  , hi=1
-                                  , back_as=None
-                                   )
+            with self.db.get_cursor() as cursor:
+                actual = cursor._some( "SELECT * FROM foo"
+                                     , parameters=None
+                                     , lo=1
+                                     , hi=1
+                                      )
         except TooMany as exc:
             actual = str(exc)
         assert actual == "Got 2 rows; expecting exactly 1."
@@ -110,12 +110,12 @@ class TestWrongNumberException(WithData):
         self.db.run("INSERT INTO foo VALUES ('blam')")
         self.db.run("INSERT INTO foo VALUES ('blim')")
         try:
-            actual = self.db._some( "SELECT * FROM foo"
-                                  , parameters=None
-                                  , lo=1
-                                  , hi=3
-                                  , back_as=None
-                                   )
+            with self.db.get_cursor() as cursor:
+                actual = cursor._some( "SELECT * FROM foo"
+                                     , parameters=None
+                                     , lo=1
+                                     , hi=3
+                                      )
         except TooMany as exc:
             actual = str(exc)
         assert actual == "Got 4 rows; expecting between 1 and 3 (inclusive)."
