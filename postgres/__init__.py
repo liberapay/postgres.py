@@ -166,6 +166,7 @@ try:                    # Python 2
 except ImportError:     # Python 3
     import urllib.parse as urlparse
 from collections import namedtuple
+from inspect import isclass
 
 import psycopg2
 from postgres.orm import Model
@@ -409,7 +410,15 @@ class Postgres(object):
         >>> db.one("SELECT * FROM foo WHERE bar='blam'", default=False)
         False
 
-        We specifically don't support passing lambdas or other callables for
+        If you pass an :py:class:`Exception` instance or subclass, we will
+        raise that for you:
+
+        >>> db.one("SELECT * FROM foo WHERE bar='blam'", default=Exception)
+        Traceback (most recent call last):
+            ...
+        Exception
+
+        We specifically stop short of supporting lambdas or other callables for
         the :py:attr:`default` parameter. That gets complicated quickly, and
         it's easy to just check the return value in the caller and do your
         extra logic there.
@@ -471,6 +480,8 @@ class Postgres(object):
 
         # default
         if out is None:
+            if isexception(default):
+                raise default
             out = default
 
         return out
@@ -898,6 +909,17 @@ def make_DelegatingCaster(postgres):
             return instance
 
     return DelegatingCaster
+
+
+def isexception(obj):
+    """Given an object, return a boolean indicating whether it is an instance
+    or subclass of Exception.
+    """
+    if isinstance(obj, Exception):
+        return True
+    if isclass(obj) and issubclass(obj, Exception):
+        return True
+    return False
 
 
 if __name__ == '__main__':
