@@ -145,7 +145,7 @@ To update your database, add a method to your model:
     ...         self.db.run( "UPDATE foo SET baz=%s WHERE bar=%s"
     ...                    , (baz, self.bar)
     ...                     )
-    ...         self.update_attributes(baz=baz)
+    ...         self.set_attributes(baz=baz)
     ...
     >>> db.register_model(Foo)
 
@@ -161,7 +161,7 @@ Then use that method to update the database:
     90210
 
 We never update your database for you. We also never sync your objects for you:
-note the use of the :py:meth:`~postgres.orm.Model.update_attributes` method to
+note the use of the :py:meth:`~postgres.orm.Model.set_attributes` method to
 sync our instance after modifying the database.
 
 
@@ -211,7 +211,7 @@ class Model(object):
     These attributes are read-only. We don't update your database. You are
     expected to do that yourself in methods on your subclass. To keep instance
     attributes in sync after a database update, use the
-    :py:meth:`~postgres.orm.Model.update_attributes` helper.
+    :py:meth:`~postgres.orm.Model.set_attributes` helper.
 
     """
 
