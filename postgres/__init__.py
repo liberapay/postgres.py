@@ -55,6 +55,8 @@ values instead of a record or list of records:
 Jump ahead for the :ref:`orm-tutorial`.
 
 
+.. _bind-parameters:
+
 Bind Parameters
 +++++++++++++++
 
@@ -350,11 +352,13 @@ class Postgres(object):
         """Execute a query and discard any results.
 
         :param string sql: the SQL statement to execute
-        :param parameters: the bind parameters for the SQL statement
+        :param parameters: the `bind parameters`_ for the SQL statement
         :type parameters: dict or tuple
         :param a: passed through to :py:meth:`~postgres.Postgres.get_cursor`
         :param kw: passed through to :py:meth:`~postgres.Postgres.get_cursor`
         :returns: :py:const:`None`
+
+        .. _bind parameters: #bind-parameters
 
         >>> db.run("DROP TABLE IF EXISTS foo CASCADE")
         >>> db.run("CREATE TABLE foo (bar text, baz int)")
@@ -370,7 +374,7 @@ class Postgres(object):
         """Execute a query and return a single result or a default value.
 
         :param string sql: the SQL statement to execute
-        :param parameters: the bind parameters for the SQL statement
+        :param parameters: the `bind parameters`_ for the SQL statement
         :type parameters: dict or tuple
         :param back_as: the type of record to return
         :type back_as: type or string
@@ -382,6 +386,8 @@ class Postgres(object):
         :returns: a single record or value or the value of the
             :py:attr:`default` argument
         :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
+
+        .. _bind parameters: #bind-parameters
 
         Use this for the common case where there should only be one record, but
         it may not exist yet.
@@ -474,7 +480,7 @@ class Postgres(object):
         """Execute a query and return all results.
 
         :param string sql: the SQL statement to execute
-        :param parameters: the bind parameters for the SQL statement
+        :param parameters: the `bind parameters`_ for the SQL statement
         :type parameters: dict or tuple
         :param back_as: the type of record to return
         :type back_as: type or string
@@ -484,6 +490,8 @@ class Postgres(object):
             :py:meth:`~postgres.Postgres.get_cursor`
         :returns: :py:class:`list` of records or :py:class:`list` of single
             values
+
+        .. _bind parameters: #bind-parameters
 
         >>> db.all("SELECT * FROM foo ORDER BY bar")
         [Record(bar='bit', baz=537), Record(bar='buz', baz=42)]
