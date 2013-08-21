@@ -664,13 +664,28 @@ class Postgres(object):
         :raises: :py:exc:`~postgres.NotRegistered`
 
         """
+        key = self.check_registration(ModelSubclass)
+        del self.model_registry[key]
+
+
+    def check_registration(self, ModelSubclass):
+        """Check whether an ORM model is registered.
+
+        :param ModelSubclass: the :py:class:`~postgres.orm.Model` subclass to
+            check for
+        :returns: the :py:attr:`typname` (a string) for which this model is
+            registered
+        :rettype: string
+        :raises: :py:exc:`~postgres.NotRegistered`
+
+        """
         key = None
         for key, v in self.model_registry.items():
             if v is ModelSubclass:
                 break
         if key is None:
             raise NotRegistered(ModelSubclass)
-        del self.model_registry[key]
+        return key
 
 
 # Context Managers
@@ -875,7 +890,12 @@ def make_DelegatingCaster(postgres):
                 raise NotImplementedError
 
             ModelSubclass = postgres.model_registry[self.name]
-            return ModelSubclass(**dict(zip(self.attnames, values)))
+
+            instance = ModelSubclass()
+            instance._set_read_only_attributes(self.attnames)
+            instance.set_attributes(**dict(zip(self.attnames, values)))
+
+            return instance
 
     return DelegatingCaster
 

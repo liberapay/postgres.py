@@ -232,7 +232,7 @@ class TestORM(WithData):
             self.db.run( "UPDATE foo SET bar=%s WHERE bar=%s"
                        , (bar, self.bar)
                         )
-            self.update_attributes(bar=bar)
+            self.set_attributes(bar=bar)
 
     def setUp(self):
         WithData.setUp(self)

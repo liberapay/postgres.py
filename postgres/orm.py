@@ -219,33 +219,31 @@ class Model(object):
     db = None                               # will be set to a Postgres object
     __read_only_attributes = []             # bootstrap
 
-    def __init__(self, **kw):
+    def __init__(self):
         if self.db is None:
             raise NotBound(self)
-        if self.db is None:
-            raise NotRegistered(self)
+        self.db.check_registration(self)
         self.__read_only_attributes = []    # overwrite class-level one
-        for k,v in kw.items():
-            self.__read_only_attributes.append(k)
-            self.__dict__[k] = v
 
     def __setattr__(self, name, value):
         if name in self.__read_only_attributes:
             raise ReadOnly(name)
         return super(Model, self).__setattr__(name, value)
 
-    def update_attributes(self, **kw):
-        """Update instance attributes, according to :py:attr:`kw`.
+    def _set_read_only_attributes(self, attribute_names):
+        self.__read_only_attributes = attribute_names
+
+    def set_attributes(self, **kw):
+        """Set instance attributes, according to :py:attr:`kw`.
 
         :raises: :py:exc:`~postgres.orm.UnknownAttributes`
 
         Call this when you update state in the database and you want to keep
-        instance attributes in sync. Note that the only attributes we can
-        update here are the ones that were given to us by the
-        :py:mod:`psycopg2` composite caster machinery when we were first
-        instantiated. These will be the fields of the composite type for which
-        we were registered, which will be column names for table and view
-        types.
+        instance attributes in sync. Note that the only attributes we can set
+        here are the ones that were given to us by the :py:mod:`psycopg2`
+        composite caster machinery when we were first instantiated. These will
+        be the fields of the composite type for which we were registered, which
+        will be column names for table and view types.
 
         """
         unknown = []
