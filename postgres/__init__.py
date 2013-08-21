@@ -410,8 +410,8 @@ class Postgres(object):
         >>> db.one("SELECT * FROM foo WHERE bar='blam'", default=False)
         False
 
-        If you pass an :py:class:`Exception` instance or subclass, we will
-        raise that for you:
+        If you pass an :py:class:`Exception` instance or subclass for
+        :py:attr:`default`, we will raise that for you:
 
         >>> db.one("SELECT * FROM foo WHERE bar='blam'", default=Exception)
         Traceback (most recent call last):
