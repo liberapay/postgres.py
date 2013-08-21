@@ -19,7 +19,7 @@ The Context Managers
 Simple Cursors
 --------------
 
-.. automodule:: postgres.cursor
+.. automodule:: postgres.cursors
     :members:
     :member-order: bysource
 
