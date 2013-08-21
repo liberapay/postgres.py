@@ -141,7 +141,7 @@ To update your database, add a method to your model:
     ...
     ...     typname = "foo"
     ...
-    ...     def set_baz(self, baz):
+    ...     def update_baz(self, baz):
     ...         self.db.run( "UPDATE foo SET baz=%s WHERE bar=%s"
     ...                    , (baz, self.bar)
     ...                     )
@@ -154,7 +154,7 @@ Then use that method to update the database:
     >>> db.one("SELECT baz FROM foo WHERE bar='blam'")
     42
     >>> foo = db.one("SELECT foo.*::foo FROM foo WHERE bar='blam'")
-    >>> foo.set_baz(90210)
+    >>> foo.update_baz(90210)
     >>> foo.baz
     90210
     >>> db.one("SELECT baz FROM foo WHERE bar='blam'")
