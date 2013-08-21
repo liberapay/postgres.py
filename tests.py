@@ -5,6 +5,7 @@ from collections import namedtuple
 from unittest import TestCase
 
 from postgres import Postgres, TooFew, TooMany
+from postgres.orm import ReadOnly
 from psycopg2.extras import RealDictCursor
 from psycopg2 import InterfaceError, ProgrammingError
 
@@ -249,6 +250,12 @@ class TestORM(WithData):
         one.update_bar("blah")
         bar = self.db.one("SELECT bar FROM foo WHERE bar='blah'")
         assert bar == one.bar
+
+    def test_attributes_are_read_only(self):
+        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        def assign():
+            one.bar = "blah"
+        self.assertRaises(ReadOnly, assign)
 
 
 # cursor_factory
