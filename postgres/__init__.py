@@ -662,7 +662,8 @@ class Postgres(object):
 
         :param ModelSubclass: the :py:class:`~postgres.orm.Model` subclass to
             unregister
-        :raises: :py:exc:`~postgres.NotRegistered`
+        :raises: :py:exc:`~postgres.NotAModel`,
+            :py:exc:`~postgres.NotRegistered`
 
         If :py:class:`ModelSubclass` is registered for multiple types, it is
         unregistered for all of them.
@@ -690,7 +691,8 @@ class Postgres(object):
             types
 
         :rettype: string
-        :raises: :py:exc:`~postgres.NotRegistered`
+        :raises: :py:exc:`~postgres.NotAModel`,
+            :py:exc:`~postgres.NotRegistered`
 
         """
         self._validate_model_subclass(ModelSubclass)
