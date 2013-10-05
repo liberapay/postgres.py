@@ -599,11 +599,17 @@ class Postgres(object):
         return ConnectionContextManager(self.pool)
 
 
-    def register_model(self, ModelSubclass):
+    def register_model(self, ModelSubclass, typname=None):
         """Register an ORM model.
 
         :param ModelSubclass: the :py:class:`~postgres.orm.Model` subclass to
             register with this :py:class:`~postgres.Postgres` instance
+
+        :param typname: a string indicating the Postgres type to register this
+            model for (``typname``, without an "e," is the name of the relevant
+            column in the underlying ``pg_type`` table). If :py:class:`None`,
+            we'll look for :py:attr:`ModelSubclass.typname`.
+
         :raises: :py:exc:`~postgres.NotAModel`,
             :py:exc:`~postgres.NoTypeSpecified`,
             :py:exc:`~postgres.NoSuchType`,
@@ -618,28 +624,30 @@ class Postgres(object):
         if not issubclass(ModelSubclass, Model):
             raise NotAModel(ModelSubclass)
 
-        if getattr(ModelSubclass, 'typname', None) is None:
-            raise NoTypeSpecified(ModelSubclass)
+        if typname is None:
+            typname = getattr(ModelSubclass, 'typname', None)
+            if typname is None:
+                raise NoTypeSpecified(ModelSubclass)
 
         n = self.one( "SELECT count(*) FROM pg_type WHERE typname=%s"
-                    , (ModelSubclass.typname,)
+                    , (typname,)
                      )
         if n < 1:
             # Could be more than one since we don't constrain by typnamespace.
             # XXX What happens then?
-            raise NoSuchType(ModelSubclass.typname)
+            raise NoSuchType(typname)
 
-        if ModelSubclass.typname in self.model_registry:
-            existing_model = self.model_registry[ModelSubclass.typname]
-            raise AlreadyRegistered(existing_model, ModelSubclass.typname)
+        if typname in self.model_registry:
+            existing_model = self.model_registry[typname]
+            raise AlreadyRegistered(existing_model, typname)
 
-        self.model_registry[ModelSubclass.typname] = ModelSubclass
+        self.model_registry[typname] = ModelSubclass
         ModelSubclass.db = self
 
-        # register a composite (but don't use RealDictCursor, not sure why)
+        # register a composite
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            name = ModelSubclass.typname
+            name = typname
             if sys.version_info[0] < 3:
                 name = name.encode('UTF-8')
             register_composite( name
@@ -656,9 +664,16 @@ class Postgres(object):
             unregister
         :raises: :py:exc:`~postgres.NotRegistered`
 
+        If :py:class:`ModelSubclass` is registered for multiple types, it is
+        unregistered for all of them.
+
         """
-        key = self.check_registration(ModelSubclass)
-        del self.model_registry[key]
+        keys = self.check_registration(ModelSubclass)
+        if not isinstance(keys, list):
+            # Wrap single string in a list. Flip-side of XXX just below.
+            keys = [keys]
+        for key in keys:
+            del self.model_registry[key]
 
 
     def check_registration(self, ModelSubclass):
@@ -666,20 +681,23 @@ class Postgres(object):
 
         :param ModelSubclass: the :py:class:`~postgres.orm.Model` subclass to
             check for
+
         :returns: the :py:attr:`typname` (a string) for which this model is
-            registered
+            registered, or a list of strings if it's registered for multiple
+            types
+
         :rettype: string
         :raises: :py:exc:`~postgres.NotRegistered`
 
         """
-        key = None
-        for k, v in self.model_registry.items():
-            if v is ModelSubclass:
-                key = k
-                break
-        if key is None:
+        keys = [k for k,v in self.model_registry.items() if v is ModelSubclass]
+        if not keys:
             raise NotRegistered(ModelSubclass)
-        return key
+        if len(keys) == 1:
+            # Dereference a single-item list, for backwards-compatibility.
+            # XXX If/when we go to 3.0, lose this cruft (always return list).
+            keys = keys[0]
+        return keys
 
 
 # Class Factories

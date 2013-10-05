@@ -6,7 +6,7 @@ from unittest import TestCase
 
 from postgres import Postgres, NotRegistered
 from postgres.cursors import TooFew, TooMany, SimpleDictCursor
-from postgres.orm import ReadOnly
+from postgres.orm import ReadOnly, Model
 from psycopg2 import InterfaceError, ProgrammingError
 from pytest import raises
 
@@ -223,14 +223,11 @@ class TestConnection(WithData):
 
 class TestORM(WithData):
 
-    from postgres.orm import Model
-
     class MyModel(Model):
 
         typname = "foo"
 
         def __init__(self, record):
-            from postgres.orm import Model
             Model.__init__(self, record)
             self.bar_from_init = record['bar']
 
@@ -246,6 +243,10 @@ class TestORM(WithData):
 
     def tearDown(self):
         self.db.model_registry = {}
+
+    def installFlah(self):
+        self.db.run("CREATE TABLE flah (bar text)")
+        self.db.register_model(self.MyModel, 'flah')
 
     def test_orm_basically_works(self):
         one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
@@ -270,6 +271,37 @@ class TestORM(WithData):
     def test_check_register_raises_if_passed_a_model_instance(self):
         obj = self.MyModel({'bar': 'baz'})
         raises(NotRegistered, self.db.check_registration, obj)
+
+    def test_a_model_can_be_used_for_a_second_type(self):
+        self.installFlah()
+        self.db.run("INSERT INTO flah VALUES ('double')")
+        self.db.run("INSERT INTO flah VALUES ('trouble')")
+        flah = self.db.one("SELECT flah.*::flah FROM flah WHERE bar='double'")
+        assert flah.bar == "double"
+
+    def test_check_register_returns_string_for_single(self):
+        assert self.db.check_registration(self.MyModel) == 'foo'
+
+    def test_check_register_returns_list_for_multiple(self):
+        self.installFlah()
+        actual = list(sorted(self.db.check_registration(self.MyModel)))
+        assert actual == ['flah', 'foo']
+
+    def test_unregister_unregisters_one(self):
+        self.db.unregister_model(self.MyModel)
+        assert self.db.model_registry == {}
+
+    def test_unregister_leaves_other(self):
+        self.db.run("CREATE TABLE flum (bar text)")
+        class OtherModel(Model): pass
+        self.db.register_model(OtherModel, 'flum')
+        self.db.unregister_model(self.MyModel)
+        assert self.db.model_registry == {'flum': OtherModel}
+
+    def test_unregister_unregisters_multiple(self):
+        self.installFlah()
+        self.db.unregister_model(self.MyModel)
+        assert self.db.model_registry == {}
 
 
 # cursor_factory
