@@ -782,11 +782,8 @@ def make_DelegatingCaster(postgres):
                 raise NotImplementedError
 
             ModelSubclass = postgres.model_registry[self.name]
-
-            instance = ModelSubclass()
-            instance._set_read_only_attributes(self.attnames)
-            instance.set_attributes(**dict(zip(self.attnames, values)))
-
+            record = dict(zip(self.attnames, values))
+            instance = ModelSubclass(record)
             return instance
 
     return DelegatingCaster

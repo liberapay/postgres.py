@@ -228,6 +228,11 @@ class TestORM(WithData):
 
         typname = "foo"
 
+        def __init__(self, record):
+            from postgres.orm import Model
+            Model.__init__(self, record)
+            self.bar_from_init = record['bar']
+
         def update_bar(self, bar):
             self.db.run( "UPDATE foo SET bar=%s WHERE bar=%s"
                        , (bar, self.bar)
@@ -244,6 +249,10 @@ class TestORM(WithData):
     def test_orm_basically_works(self):
         one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
         assert one.__class__ == self.MyModel
+
+    def test_orm_models_get_kwargs_to_init(self):
+        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        assert one.bar_from_init == 'baz'
 
     def test_updating_attributes_works(self):
         one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")

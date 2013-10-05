@@ -202,15 +202,16 @@ class NotRegistered(Exception):
 # =====
 
 class Model(object):
-    """
+    """This is the base class for models in :py:mod:`postgres.orm`.
 
-    This is the base class for models in :py:mod:`postgres.orm`. Instances of
-    subclasses of :py:class:`~postgres.orm.Model` will have an attribute for
-    each field in the composite type for which the subclass is registered (for
-    table and view types, these will be the columns of the table or view).
-    These attributes are read-only. We don't update your database. You are
-    expected to do that yourself in methods on your subclass. To keep instance
-    attributes in sync after a database update, use the
+    :param dict record: The raw query result
+
+    Instances of subclasses of :py:class:`~postgres.orm.Model` will have an
+    attribute for each field in the composite type for which the subclass is
+    registered (for table and view types, these will be the columns of the
+    table or view).  These attributes are read-only. We don't update your
+    database. You are expected to do that yourself in methods on your subclass.
+    To keep instance attributes in sync after a database update, use the
     :py:meth:`~postgres.orm.Model.set_attributes` helper.
 
     """
@@ -219,19 +220,17 @@ class Model(object):
     db = None                               # will be set to a Postgres object
     __read_only_attributes = []             # bootstrap
 
-    def __init__(self):
+    def __init__(self, record):
         if self.db is None:
             raise NotBound(self)
         self.db.check_registration(self)
-        self.__read_only_attributes = []    # overwrite class-level one
+        self.__read_only_attributes = record.keys()
+        self.set_attributes(**record)
 
     def __setattr__(self, name, value):
         if name in self.__read_only_attributes:
             raise ReadOnly(name)
         return super(Model, self).__setattr__(name, value)
-
-    def _set_read_only_attributes(self, attribute_names):
-        self.__read_only_attributes = attribute_names
 
     def set_attributes(self, **kw):
         """Set instance attributes, according to :py:attr:`kw`.
