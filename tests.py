@@ -4,7 +4,7 @@ import os
 from collections import namedtuple
 from unittest import TestCase
 
-from postgres import Postgres, NotRegistered
+from postgres import Postgres, NotAModel, NotRegistered
 from postgres.cursors import TooFew, TooMany, SimpleDictCursor
 from postgres.orm import ReadOnly, Model
 from psycopg2 import InterfaceError, ProgrammingError
@@ -270,7 +270,27 @@ class TestORM(WithData):
 
     def test_check_register_raises_if_passed_a_model_instance(self):
         obj = self.MyModel({'bar': 'baz'})
-        raises(NotRegistered, self.db.check_registration, obj)
+        raises(NotAModel, self.db.check_registration, obj)
+
+    def test_check_register_doesnt_include_subsubclasses(self):
+        class Other(self.MyModel): pass
+        raises(NotRegistered, self.db.check_registration, Other)
+
+    def test_dot_dot_dot_unless_you_ask_it_to(self):
+        class Other(self.MyModel): pass
+        assert self.db.check_registration(Other, True) == 'foo'
+
+    def test_check_register_handles_complex_cases(self):
+        self.installFlah()
+
+        class Second(Model): pass
+        self.db.run("CREATE TABLE blum (bar text)")
+        self.db.register_model(Second, 'blum')
+        assert self.db.check_registration(Second) == 'blum'
+
+        class Third(self.MyModel, Second): pass
+        actual = list(sorted(self.db.check_registration(Third, True)))
+        assert actual == ['blum', 'flah', 'foo']
 
     def test_a_model_can_be_used_for_a_second_type(self):
         self.installFlah()

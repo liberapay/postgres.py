@@ -168,6 +168,7 @@ except ImportError:     # Python 3
 from collections import namedtuple
 
 import psycopg2
+from inspect import isclass
 from postgres.context_managers import ConnectionContextManager
 from postgres.context_managers import CursorContextManager
 from postgres.cursors import SimpleTupleCursor, SimpleNamedTupleCursor
@@ -214,8 +215,8 @@ class NotASimpleCursor(Exception):
 class NotAModel(Exception):
     def __str__(self):
         return "Only subclasses of postgres.orm.Model can be registered as " \
-               "orm models. {} (registered for {}) doesn't fit the bill." \
-               .format(self.args[0].__name__, self.args[1])
+               "orm models. {} doesn't fit the bill." \
+               .format(self.args[0])
 
 class NoTypeSpecified(Exception):
     def __str__(self):
@@ -621,8 +622,7 @@ class Postgres(object):
             subclassing :py:class:`~postgres.orm.Model`.
 
         """
-        if not issubclass(ModelSubclass, Model):
-            raise NotAModel(ModelSubclass)
+        self._validate_model_subclass(ModelSubclass)
 
         if typname is None:
             typname = getattr(ModelSubclass, 'typname', None)
@@ -676,11 +676,14 @@ class Postgres(object):
             del self.model_registry[key]
 
 
-    def check_registration(self, ModelSubclass):
+    def check_registration(self, ModelSubclass, include_subsubclasses=False):
         """Check whether an ORM model is registered.
 
         :param ModelSubclass: the :py:class:`~postgres.orm.Model` subclass to
             check for
+        :param bool include_subsubclasses: whether to also check for subclasses
+            of :py:class:`ModelSubclass` or just :py:class:`ModelSubclass`
+            itself
 
         :returns: the :py:attr:`typname` (a string) for which this model is
             registered, or a list of strings if it's registered for multiple
@@ -690,7 +693,13 @@ class Postgres(object):
         :raises: :py:exc:`~postgres.NotRegistered`
 
         """
-        keys = [k for k,v in self.model_registry.items() if v is ModelSubclass]
+        self._validate_model_subclass(ModelSubclass)
+
+        if include_subsubclasses:
+            filt = lambda v: v is ModelSubclass or issubclass(ModelSubclass, v)
+        else:
+            filt = lambda v: v is ModelSubclass
+        keys = [k for k,v in self.model_registry.items() if filt(v)]
         if not keys:
             raise NotRegistered(ModelSubclass)
         if len(keys) == 1:
@@ -698,6 +707,11 @@ class Postgres(object):
             # XXX If/when we go to 3.0, lose this cruft (always return list).
             keys = keys[0]
         return keys
+
+
+    def _validate_model_subclass(self, ModelSubclass, ):
+        if not isclass(ModelSubclass) or not issubclass(ModelSubclass, Model):
+            raise NotAModel(ModelSubclass)
 
 
 # Class Factories
