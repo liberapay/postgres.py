@@ -5,7 +5,7 @@ The :py:mod:`postgres` library extends the cursors provided by
 and :py:meth:`all`.
 
 """
-from __future__ import print_function, unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from inspect import isclass
 

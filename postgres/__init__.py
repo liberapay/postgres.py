@@ -148,7 +148,7 @@ The Postgres Object
 .. _SQL injection: http://en.wikipedia.org/wiki/SQL_injection
 
 """
-from __future__ import print_function, unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import sys
 try:                    # Python 2
