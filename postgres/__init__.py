@@ -673,8 +673,9 @@ class Postgres(object):
 
         """
         key = None
-        for key, v in self.model_registry.items():
+        for k, v in self.model_registry.items():
             if v is ModelSubclass:
+                key = k
                 break
         if key is None:
             raise NotRegistered(ModelSubclass)

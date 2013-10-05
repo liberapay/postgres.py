@@ -4,10 +4,11 @@ import os
 from collections import namedtuple
 from unittest import TestCase
 
-from postgres import Postgres
+from postgres import Postgres, NotRegistered
 from postgres.cursors import TooFew, TooMany, SimpleDictCursor
 from postgres.orm import ReadOnly
 from psycopg2 import InterfaceError, ProgrammingError
+from pytest import raises
 
 
 DATABASE_URL = os.environ['DATABASE_URL']
@@ -265,6 +266,10 @@ class TestORM(WithData):
         def assign():
             one.bar = "blah"
         self.assertRaises(ReadOnly, assign)
+
+    def test_check_register_raises_if_passed_a_model_instance(self):
+        obj = self.MyModel({'bar': 'baz'})
+        raises(NotRegistered, self.db.check_registration, obj)
 
 
 # cursor_factory

@@ -223,7 +223,7 @@ class Model(object):
     def __init__(self, record):
         if self.db is None:
             raise NotBound(self)
-        self.db.check_registration(self)
+        self.db.check_registration(self.__class__)
         self.__read_only_attributes = record.keys()
         self.set_attributes(**record)
 
