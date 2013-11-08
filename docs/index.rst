@@ -1,5 +1,5 @@
-postgres
-========
+postgres.py
+===========
 
 .. automodule:: postgres
     :members:
