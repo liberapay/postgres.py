@@ -1,4 +1,4 @@
-postgres.py
+Postgres.py
 ===========
 
 .. automodule:: postgres
