@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 # Run both pytests and doctests, but only vary the return code on the result of
 # the pytests. The doctests can fail for spurious reasons, and we chose not to
@@ -16,9 +16,9 @@ function run_doctests() {
     python postgres/orm.py
     echo ""
     python --version 2>&1 | grep 'Python 3' > /dev/null && \
-        echo "\x1b[31mYou may see errors\x1b[0m due to dict ordering not being stable."
+        echo -e "\x1b[31mYou may see errors\x1b[0m due to dict ordering not being stable."
     python --version 2>&1 | grep 'Python 2' > /dev/null && \
-        echo "\x1b[31mYou're using Python 2.\x1b[0m Expect errors comparing '' and u''." && \
+        echo -e "\x1b[31mYou're using Python 2.\x1b[0m Expect errors comparing '' and u''." && \
         echo "You may also see errors due to dict ordering not being stable."
     echo "We don't fix these because that would make docs uglier."
     echo ""
