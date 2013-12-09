@@ -177,7 +177,7 @@ from psycopg2.extras import register_composite, CompositeCaster
 from psycopg2.pool import ThreadedConnectionPool as ConnectionPool
 
 
-__version__ = '2.1.1-dev'
+__version__ = '2.1.2'
 
 
 # A Helper
