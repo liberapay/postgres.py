@@ -152,15 +152,15 @@ class SimpleCursorBase(object):
         return recs
 
 
-class SimpleTupleCursor(TupleCursor, SimpleCursorBase):
+class SimpleTupleCursor(SimpleCursorBase, TupleCursor):
     """A `simple cursor`_ that returns tuples.
     """
 
-class SimpleNamedTupleCursor(NamedTupleCursor, SimpleCursorBase):
+class SimpleNamedTupleCursor(SimpleCursorBase, NamedTupleCursor):
     """A `simple cursor`_ that returns namedtuples.
     """
 
-class SimpleDictCursor(RealDictCursor, SimpleCursorBase):
+class SimpleDictCursor(SimpleCursorBase, RealDictCursor):
     """A `simple cursor`_ that returns dicts.
     """
 

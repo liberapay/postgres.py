@@ -204,6 +204,17 @@ class TestCursor(WithData):
                          , cursor.fetchall
                           )
 
+    def test_monkey_patch_execute(self):
+        expected = "SELECT 1"
+        def execute(this, sql, params=[]):
+            return sql
+        from postgres.cursors import SimpleCursorBase
+        SimpleCursorBase.execute = execute
+        with self.db.get_cursor() as cursor:
+            actual = cursor.execute(expected)
+        del SimpleCursorBase.execute
+        assert actual == expected
+
 
 # db.get_connection
 # =================
