@@ -20,7 +20,7 @@ We `test <https://travis-ci.org/gittip/postgres.py>`_ against Python 2.6, 2.7,
 See Also
 --------
 
-The `sql`_ library provides the run / one / all API for any DB API 2.0 driver.
+The `sql`_ library provides a run / one / all API for any DB API 2.0 driver.
 
 
 Tutorial
