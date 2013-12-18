@@ -17,6 +17,12 @@ We `test <https://travis-ci.org/gittip/postgres.py>`_ against Python 2.6, 2.7,
 :py:mod:`postgres` is in the `public domain`_.
 
 
+See Also
+--------
+
+The `sql`_ library provides the run / one / all API for any DB API 2.0 driver.
+
+
 Tutorial
 --------
 
@@ -143,6 +149,7 @@ The Postgres Object
 .. _PyPI: https://pypi.python.org/pypi/postgres
 .. _this advice: http://initd.org/psycopg/docs/usage.html#unicode-handling
 .. _public domain: http://creativecommons.org/publicdomain/zero/1.0/
+.. _sql: https://pypi.python.org/pypi/sql
 .. _DB-API 2.0: http://www.python.org/dev/peps/pep-0249/
 .. _SQL injection: http://en.wikipedia.org/wiki/SQL_injection
 
