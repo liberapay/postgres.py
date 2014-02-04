@@ -204,8 +204,17 @@ def url_to_dsn(url):
     port = parsed.port
     if port is None:
         port = '5432' # postgres default port
-    dsn = "dbname=%s user=%s password=%s host=%s port=%s"
-    dsn %= (dbname, user, password, host, port)
+
+    dsn = "dbname=" + dbname
+    if user is not None:
+        dsn += " user=" + user
+    if password is not None:
+        dsn += " password=" + password
+    if host is not None:
+        dsn += " host=" + host
+    if port is not None:
+        dsn += " port=" + port
+
     return dsn
 
 
