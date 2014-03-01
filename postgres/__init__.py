@@ -379,7 +379,7 @@ class Postgres(object):
         :param string sql: the SQL statement to execute
         :param parameters: the `bind parameters`_ for the SQL statement
         :type parameters: dict or tuple
-        :param default: the value to return if no results are found
+        :param default: the value to return or raise if no results are found
         :param back_as: the type of record to return
         :type back_as: type or string
         :param a: passed through to :py:meth:`~postgres.Postgres.get_cursor`
@@ -387,6 +387,7 @@ class Postgres(object):
         :returns: a single record or value or the value of the
             :py:attr:`default` argument
         :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
+            or `default` (if `default` is an `Exception` subclass or instance)
 
         .. _bind parameters: #bind-parameters
 
