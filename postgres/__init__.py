@@ -384,11 +384,11 @@ class Postgres(object):
         :type back_as: type or string
         :param a: passed through to :py:meth:`~postgres.Postgres.get_cursor`
         :param kw: passed through to :py:meth:`~postgres.Postgres.get_cursor`
-        :returns: a single record or value or the value of the
-            :py:attr:`default` argument
-        :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
+        :returns: a single record or value, or :py:attr:`default` (if
+            :py:attr:`default` is not an :py:class:`Exception`)
+        :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`,
             or :py:attr:`default` (if :py:attr:`default` is an
-            :py:class:`Exception` subclass or instance)
+            :py:class:`Exception`)
 
         .. _bind parameters: #bind-parameters
 
