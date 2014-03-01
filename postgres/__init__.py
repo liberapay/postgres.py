@@ -387,7 +387,8 @@ class Postgres(object):
         :returns: a single record or value or the value of the
             :py:attr:`default` argument
         :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`
-            or `default` (if `default` is an `Exception` subclass or instance)
+            or :py:attr:`default` (if :py:attr:`default` is an
+            :py:class:`Exception` subclass or instance)
 
         .. _bind parameters: #bind-parameters
 
