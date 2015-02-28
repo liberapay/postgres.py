@@ -339,8 +339,21 @@ class TestORM(WithData):
         one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
         assert one.boo is None
 
+    def test_replace_column_different_type(self):
+        self.db.run("CREATE TABLE grok (bar int)")
+        self.db.run("INSERT INTO grok VALUES (0)")
+        class EmptyModel(Model): pass
+        self.db.register_model(EmptyModel, 'grok')
+        # Add a new column then drop the original one
+        self.db.run("ALTER TABLE grok ADD COLUMN biz text NOT NULL DEFAULT 'x'")
+        self.db.run("ALTER TABLE grok DROP COLUMN bar")
+        # The number of columns hasn't changed but the names and types have
+        one = self.db.one("SELECT grok.*::grok FROM grok LIMIT 1")
+        assert one.biz == 'x'
+        assert not hasattr(one, 'bar')
+
     @mark.xfail
-    def test_add_and_drop_columns(self):
+    def test_replace_column_same_type(self):
         self.db.run("ALTER TABLE foo ADD COLUMN biz int NOT NULL DEFAULT 0")
         self.db.run("ALTER TABLE foo DROP COLUMN bar")
         one = self.db.one("SELECT foo.*::foo FROM foo LIMIT 1")
