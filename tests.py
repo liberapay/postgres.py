@@ -334,6 +334,11 @@ class TestORM(WithData):
         self.db.unregister_model(self.MyModel)
         assert self.db.model_registry == {}
 
+    def test_add_column_doesnt_break_anything(self):
+        self.db.run("ALTER TABLE foo ADD COLUMN boo text")
+        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        assert one.boo is None
+
 
 # cursor_factory
 # ==============
