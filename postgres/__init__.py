@@ -839,17 +839,24 @@ def make_DelegatingCaster(postgres):
             instance = ModelSubclass(record)
             return instance
 
-        def parse(self, s, curs):
+        def parse(self, s, curs, retry=False):
             if s is None:
                 return None
 
             tokens = self.tokenize(s)
             if len(tokens) != len(self.atttypes):
-                # The type has changed, re-fetch it from the DB
+                # The number of columns has changed, re-fetch the type info
                 self.__dict__.update(self._from_db(self.name, curs).__dict__)
 
-            values = [ curs.cast(oid, token)
-                for oid, token in zip(self.atttypes, tokens) ]
+            try:
+                values = [ curs.cast(oid, token)
+                    for oid, token in zip(self.atttypes, tokens) ]
+            except ValueError:
+                # The type of a column has changed, re-fetch it and retry once
+                if retry:
+                    raise
+                self.__dict__.update(self._from_db(self.name, curs).__dict__)
+                return self.parse(s, curs, True)
 
             return self.make(values)
 
