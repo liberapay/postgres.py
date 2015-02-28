@@ -8,7 +8,7 @@ from postgres import Postgres, NotAModel, NotRegistered
 from postgres.cursors import TooFew, TooMany, SimpleDictCursor
 from postgres.orm import ReadOnly, Model
 from psycopg2 import InterfaceError, ProgrammingError
-from pytest import raises
+from pytest import mark, raises
 
 
 DATABASE_URL = os.environ['DATABASE_URL']
@@ -338,6 +338,14 @@ class TestORM(WithData):
         self.db.run("ALTER TABLE foo ADD COLUMN boo text")
         one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
         assert one.boo is None
+
+    @mark.xfail
+    def test_add_and_drop_columns(self):
+        self.db.run("ALTER TABLE foo ADD COLUMN biz int NOT NULL DEFAULT 0")
+        self.db.run("ALTER TABLE foo DROP COLUMN bar")
+        one = self.db.one("SELECT foo.*::foo FROM foo LIMIT 1")
+        assert one.biz == 0
+        assert not hasattr(one, 'bar')
 
 
 # cursor_factory
