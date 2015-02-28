@@ -824,6 +824,7 @@ def make_DelegatingCaster(postgres):
 
     """
     class DelegatingCaster(CompositeCaster):
+
         def make(self, values):
             if self.name not in postgres.model_registry:
 
@@ -837,6 +838,20 @@ def make_DelegatingCaster(postgres):
             record = dict(zip(self.attnames, values))
             instance = ModelSubclass(record)
             return instance
+
+        def parse(self, s, curs):
+            if s is None:
+                return None
+
+            tokens = self.tokenize(s)
+            if len(tokens) != len(self.atttypes):
+                # The type has changed, re-fetch it from the DB
+                self.__dict__.update(self._from_db(self.name, curs).__dict__)
+
+            values = [ curs.cast(oid, token)
+                for oid, token in zip(self.atttypes, tokens) ]
+
+            return self.make(values)
 
     return DelegatingCaster
 
