@@ -826,6 +826,7 @@ def make_DelegatingCaster(postgres):
     class DelegatingCaster(CompositeCaster):
 
         def make(self, values):
+            # Override to delegate to the model registry.
             if self.name not in postgres.model_registry:
 
                 # This is probably a bug, not a normal user error. It means
@@ -840,6 +841,9 @@ def make_DelegatingCaster(postgres):
             return instance
 
         def parse(self, s, curs, retry=False):
+            # Override to protect against race conditions:
+            #   https://github.com/gratipay/postgres.py/issues/26
+
             if s is None:
                 return None
 
