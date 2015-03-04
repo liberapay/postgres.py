@@ -353,8 +353,8 @@ class TestORM(WithData):
         assert not hasattr(one, 'bar')
 
     @mark.xfail(raises=AttributeError)
-    def test_replace_column_same_type(self):
-        self.db.run("ALTER TABLE foo ADD COLUMN biz int NOT NULL DEFAULT 0")
+    def test_replace_column_same_type_different_name(self):
+        self.db.run("ALTER TABLE foo ADD COLUMN biz text NOT NULL DEFAULT 0")
         self.db.run("ALTER TABLE foo DROP COLUMN bar")
         one = self.db.one("SELECT foo.*::foo FROM foo LIMIT 1")
         assert one.biz == 0
