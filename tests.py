@@ -352,7 +352,7 @@ class TestORM(WithData):
         assert one.biz == 'x'
         assert not hasattr(one, 'bar')
 
-    @mark.xfail
+    @mark.xfail(raises=AttributeError)
     def test_replace_column_same_type(self):
         self.db.run("ALTER TABLE foo ADD COLUMN biz int NOT NULL DEFAULT 0")
         self.db.run("ALTER TABLE foo DROP COLUMN bar")
