@@ -835,7 +835,7 @@ def make_DelegatingCaster(postgres):
             tokens = self.tokenize(s)
             if len(tokens) != len(self.atttypes):
                 # The number of columns has changed, re-fetch the type info
-                self.__dict__.update(self._from_db(self.name, curs).__dict__)
+                self._refetch_type_info(curs)
 
             try:
                 values = [ curs.cast(oid, token)
@@ -844,7 +844,7 @@ def make_DelegatingCaster(postgres):
                 # The type of a column has changed, re-fetch it and retry once
                 if retry:
                     raise
-                self.__dict__.update(self._from_db(self.name, curs).__dict__)
+                self._refetch_type_info(curs)
                 return self.parse(s, curs, True)
 
             return self.make(values)
@@ -863,6 +863,12 @@ def make_DelegatingCaster(postgres):
             record = dict(zip(self.attnames, values))
             instance = ModelSubclass(record)
             return instance
+
+        def _refetch_type_info(self, curs):
+            """Given a cursor, update the current object with a fresh type definition.
+            """
+            new_self = self._from_db(self.name, curs)
+            self.__dict__.update(new_self.__dict__)
 
     return DelegatingCaster
 
