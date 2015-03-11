@@ -157,7 +157,7 @@ The Postgres Object
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import sys
-try:                    # Python 2
+if sys.version_info[0] == 2:    # Python 2
     import urlparse
 
     # "Note: In Python 2, if you want to uniformly receive all your database
@@ -169,7 +169,7 @@ try:                    # Python 2
     psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
     psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
-except ImportError:     # Python 3
+else:                           # Python 3
     import urllib.parse as urlparse
 from collections import namedtuple
 
