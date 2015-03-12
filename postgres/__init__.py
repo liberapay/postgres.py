@@ -180,6 +180,7 @@ from postgres.context_managers import CursorContextManager
 from postgres.cursors import SimpleTupleCursor, SimpleNamedTupleCursor
 from postgres.cursors import SimpleDictCursor, SimpleCursorBase
 from postgres.orm import Model
+from psycopg2 import DataError
 from psycopg2.extras import register_composite, CompositeCaster
 from psycopg2.pool import ThreadedConnectionPool as ConnectionPool
 
@@ -825,29 +826,18 @@ def make_DelegatingCaster(postgres):
     """
     class DelegatingCaster(CompositeCaster):
 
-        def parse(self, s, curs, retry=False):
+        def parse(self, s, curs, retry=True):
             # Override to protect against race conditions:
             #   https://github.com/gratipay/postgres.py/issues/26
 
-            if s is None:
-                return None
-
-            tokens = self.tokenize(s)
-            if len(tokens) != len(self.atttypes):
-                # The number of columns has changed, re-fetch the type info
-                self._refetch_type_info(curs)
-
             try:
-                values = [ curs.cast(oid, token)
-                    for oid, token in zip(self.atttypes, tokens) ]
-            except ValueError:
-                # The type of a column has changed, re-fetch it and retry once
-                if retry:
+                return super(DelegatingCaster, self).parse(s, curs)
+            except (DataError, ValueError):
+                if not retry:
                     raise
+                # Re-fetch the type info and retry once
                 self._refetch_type_info(curs)
-                return self.parse(s, curs, True)
-
-            return self.make(values)
+                return self.parse(s, curs, False)
 
         def make(self, values):
             # Override to delegate to the model registry.
