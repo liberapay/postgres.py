@@ -642,8 +642,12 @@ class Postgres(object):
         self._validate_model_subclass(ModelSubclass)
 
         if typname is None:
-            typname = getattr(ModelSubclass, 'typname', None)
-            if typname is None:
+            schematype = getattr(ModelSubclass, 'typname', None)
+            if '.' in schematype:
+                schema, typname = schematype.split('.', 1)
+            else:
+                typname = schematype
+            if schematype is None:
                 raise NoTypeSpecified(ModelSubclass)
 
         n = self.one( "SELECT count(*) FROM pg_type WHERE typname=%s"
@@ -664,7 +668,7 @@ class Postgres(object):
         # register a composite
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            name = typname
+            name = schematype
             if sys.version_info[0] < 3:
                 name = name.encode('UTF-8')
             register_composite( name
