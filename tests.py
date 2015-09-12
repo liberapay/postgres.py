@@ -8,7 +8,7 @@ from postgres import Postgres, NotAModel, NotRegistered
 from postgres.cursors import TooFew, TooMany, SimpleDictCursor
 from postgres.orm import ReadOnly, Model
 from psycopg2 import InterfaceError, ProgrammingError
-from pytest import raises
+from pytest import mark, raises
 
 
 DATABASE_URL = os.environ['DATABASE_URL']
@@ -333,6 +333,32 @@ class TestORM(WithData):
         self.installFlah()
         self.db.unregister_model(self.MyModel)
         assert self.db.model_registry == {}
+
+    def test_add_column_doesnt_break_anything(self):
+        self.db.run("ALTER TABLE foo ADD COLUMN boo text")
+        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        assert one.boo is None
+
+    def test_replace_column_different_type(self):
+        self.db.run("CREATE TABLE grok (bar int)")
+        self.db.run("INSERT INTO grok VALUES (0)")
+        class EmptyModel(Model): pass
+        self.db.register_model(EmptyModel, 'grok')
+        # Add a new column then drop the original one
+        self.db.run("ALTER TABLE grok ADD COLUMN biz text NOT NULL DEFAULT 'x'")
+        self.db.run("ALTER TABLE grok DROP COLUMN bar")
+        # The number of columns hasn't changed but the names and types have
+        one = self.db.one("SELECT grok.*::grok FROM grok LIMIT 1")
+        assert one.biz == 'x'
+        assert not hasattr(one, 'bar')
+
+    @mark.xfail(raises=AttributeError)
+    def test_replace_column_same_type_different_name(self):
+        self.db.run("ALTER TABLE foo ADD COLUMN biz text NOT NULL DEFAULT 0")
+        self.db.run("ALTER TABLE foo DROP COLUMN bar")
+        one = self.db.one("SELECT foo.*::foo FROM foo LIMIT 1")
+        assert one.biz == 0
+        assert not hasattr(one, 'bar')
 
 
 # cursor_factory

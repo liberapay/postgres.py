@@ -180,6 +180,7 @@ from postgres.context_managers import CursorContextManager
 from postgres.cursors import SimpleTupleCursor, SimpleNamedTupleCursor
 from postgres.cursors import SimpleDictCursor, SimpleCursorBase
 from postgres.orm import Model
+from psycopg2 import DataError
 from psycopg2.extras import register_composite, CompositeCaster
 from psycopg2.pool import ThreadedConnectionPool as ConnectionPool
 
@@ -824,7 +825,22 @@ def make_DelegatingCaster(postgres):
 
     """
     class DelegatingCaster(CompositeCaster):
+
+        def parse(self, s, curs, retry=True):
+            # Override to protect against race conditions:
+            #   https://github.com/gratipay/postgres.py/issues/26
+
+            try:
+                return super(DelegatingCaster, self).parse(s, curs)
+            except (DataError, ValueError):
+                if not retry:
+                    raise
+                # Re-fetch the type info and retry once
+                self._refetch_type_info(curs)
+                return self.parse(s, curs, False)
+
         def make(self, values):
+            # Override to delegate to the model registry.
             if self.name not in postgres.model_registry:
 
                 # This is probably a bug, not a normal user error. It means
@@ -837,6 +853,12 @@ def make_DelegatingCaster(postgres):
             record = dict(zip(self.attnames, values))
             instance = ModelSubclass(record)
             return instance
+
+        def _refetch_type_info(self, curs):
+            """Given a cursor, update the current object with a fresh type definition.
+            """
+            new_self = self._from_db(self.name, curs)
+            self.__dict__.update(new_self.__dict__)
 
     return DelegatingCaster
 
