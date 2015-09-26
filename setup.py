@@ -3,7 +3,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from setuptools import setup, find_packages
 
 setup( name='postgres'
-     , author='Gittip, LLC'
+     , author='Gratipay, LLC'
      , description="postgres is a high-value abstraction over psycopg2."
      , url='https://postgres-py.readthedocs.org'
      , version='2.2.0-dev'
