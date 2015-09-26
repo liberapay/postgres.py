@@ -184,7 +184,7 @@ latex_elements = {
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
   ('index', 'Postgrespy.tex', u'Postgres.py Documentation',
-   u'Gittip, LLC', 'manual'),
+   u'Gratipay, LLC', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -214,7 +214,7 @@ latex_documents = [
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'postgrespy', u'Postgres.py Documentation',
-     [u'Gittip, LLC'], 1)
+     [u'Gratipay, LLC'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -228,7 +228,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
   ('index', 'Postgrespy', u'Postgres.py Documentation',
-   u'Gittip, LLC', 'Postgrespy', 'One line description of project.',
+   u'Gratipay, LLC', 'Postgrespy', 'One line description of project.',
    'Miscellaneous'),
 ]
 

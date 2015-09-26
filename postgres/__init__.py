@@ -10,7 +10,7 @@ Installation
 
 :py:mod:`postgres` requires `psycopg2`_ version 2.5 or higher.
 
-We `test <https://travis-ci.org/gittip/postgres.py>`_ against Python 2.6, 2.7,
+We `test <https://travis-ci.org/gratipay/postgres.py>`_ against Python 2.6, 2.7,
 3.2, and 3.3. We don't yet have a testing matrix for different versions of
 :py:mod:`psycopg2` or PostgreSQL.
 
@@ -145,7 +145,7 @@ The Postgres Object
 -------------------
 
 .. _psycopg2: http://initd.org/psycopg/
-.. _GitHub: https://github.com/gittip/postgres
+.. _GitHub: https://github.com/gratipay/postgres.py
 .. _PyPI: https://pypi.python.org/pypi/postgres
 .. _this advice: http://initd.org/psycopg/docs/usage.html#unicode-handling
 .. _public domain: http://creativecommons.org/publicdomain/zero/1.0/
@@ -312,8 +312,8 @@ class Postgres(object):
     rationale behind these names. The context managers on this class are named
     starting with :py:meth:`get_` to set them apart from the simple-case API.
 
-    .. _16: https://github.com/gittip/postgres.py/issues/16
-    .. _20: https://github.com/gittip/postgres.py/issues/20
+    .. _16: https://github.com/gratipay/postgres.py/issues/16
+    .. _20: https://github.com/gratipay/postgres.py/issues/20
 
     """
 
