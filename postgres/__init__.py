@@ -214,7 +214,7 @@ def url_to_dsn(url):
     if host is not None:
         dsn += " host=" + host
     if port is not None:
-        dsn += " port=" + port
+        dsn += " port=" + str(port)
 
     return dsn
 
