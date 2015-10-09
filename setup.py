@@ -6,7 +6,7 @@ setup( name='postgres'
      , author='Gratipay, LLC'
      , description="postgres is a high-value abstraction over psycopg2."
      , url='https://postgres-py.readthedocs.org'
-     , version='2.2.1'
+     , version='2.2.1-dev'
      , packages=find_packages()
      , install_requires=['psycopg2 >= 2.5.0']
      , classifiers=[
