@@ -22,6 +22,9 @@ See Also
 
 The `sql`_ library provides a run / one / all API for any DB API 2.0 driver.
 
+The `Records`_ library provides a similar top-level API, and integration with
+SQLAlchemy and Tablib.
+
 
 Tutorial
 --------
@@ -150,6 +153,7 @@ The Postgres Object
 .. _this advice: http://initd.org/psycopg/docs/usage.html#unicode-handling
 .. _public domain: http://creativecommons.org/publicdomain/zero/1.0/
 .. _sql: https://pypi.python.org/pypi/sql
+.. _Records: https://github.com/kennethreitz/records
 .. _DB-API 2.0: http://www.python.org/dev/peps/pep-0249/
 .. _SQL injection: http://en.wikipedia.org/wiki/SQL_injection
 
