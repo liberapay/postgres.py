@@ -6,7 +6,7 @@ python:
   - 3.3
   - 3.4
 install:
-  - pip install --use-mirrors pytest ./
+  - pip install pytest ./
 before_script:
   - psql -U postgres -c 'CREATE DATABASE "test";'
   - psql -U postgres -c 'CREATE USER jrandom SUPERUSER;'
