@@ -4,9 +4,12 @@ from setuptools import setup, find_packages
 
 setup( name='postgres'
      , author='Gratipay, LLC'
+     , author_email='chad@idelic.com'
      , description="postgres is a high-value abstraction over psycopg2."
+     , long_description=open('README.md').read()
+     , long_description_content_type='text/markdown'
      , url='https://postgres-py.readthedocs.org'
-     , version='2.2.1-dev'
+     , version='2.2.2'
      , packages=find_packages()
      , install_requires=['psycopg2-binary >= 2.7.5']
      , classifiers=[
@@ -23,5 +26,5 @@ setup( name='postgres'
          'Programming Language :: SQL',
          'Topic :: Database :: Front-Ends',
          'Topic :: Software Development :: Libraries :: Python Modules',
-       ],
-      )
+       ]
+     )

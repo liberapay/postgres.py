@@ -1,6 +1,9 @@
-env
-env2
+__pycache__
+build
 dist
 distribute-*
 docs/_build
+env
+env2
 *.egg-info
+.python-version
