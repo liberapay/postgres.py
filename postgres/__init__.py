@@ -4,17 +4,17 @@
 Installation
 ------------
 
-:py:mod:`postgres` is available on `GitHub`_ and on `PyPI`_::
+:mod:`postgres` is available on `GitHub`_ and on `PyPI`_::
 
     $ pip install postgres
 
-:py:mod:`postgres` requires `psycopg2`_ version 2.5 or higher.
+:mod:`postgres` requires `psycopg2`_ version 2.5 or higher.
 
 We `test <https://travis-ci.org/gratipay/postgres.py>`_ against Python 2.6, 2.7,
 3.2, and 3.3. We don't yet have a testing matrix for different versions of
-:py:mod:`psycopg2` or PostgreSQL.
+:mod:`psycopg2` or PostgreSQL.
 
-:py:mod:`postgres` is in the `public domain`_.
+:mod:`postgres` is in the `public domain`_.
 
 
 See Also
@@ -29,25 +29,25 @@ SQLAlchemy and Tablib.
 Tutorial
 --------
 
-Instantiate a :py:class:`Postgres` object when your application starts:
+Instantiate a :class:`Postgres` object when your application starts:
 
     >>> from postgres import Postgres
     >>> db = Postgres("postgres://jrandom@localhost/test")
 
-Use :py:meth:`~postgres.Postgres.run` to run SQL statements:
+Use :meth:`~postgres.Postgres.run` to run SQL statements:
 
     >>> db.run("CREATE TABLE foo (bar text, baz int)")
     >>> db.run("INSERT INTO foo VALUES ('buz', 42)")
     >>> db.run("INSERT INTO foo VALUES ('bit', 537)")
 
-Use :py:meth:`~postgres.Postgres.one` to run SQL and fetch one result or
-:py:class:`None`:
+Use :meth:`~postgres.Postgres.one` to run SQL and fetch one result or
+:class:`None`:
 
     >>> db.one("SELECT * FROM foo WHERE bar='buz'")
     Record(bar='buz', baz=42)
     >>> db.one("SELECT * FROM foo WHERE bar='blam'")
 
-Use :py:meth:`~postgres.Postgres.all` to run SQL and fetch all results:
+Use :meth:`~postgres.Postgres.all` to run SQL and fetch all results:
 
     >>> db.all("SELECT * FROM foo ORDER BY bar")
     [Record(bar='bit', baz=537), Record(bar='buz', baz=42)]
@@ -70,7 +70,7 @@ Bind Parameters
 
 In case you're not familiar with bind parameters in `DB-API 2.0`_, the basic
 idea is that you put ``%(foo)s`` in your SQL strings, and then pass in a second
-argument, a :py:class:`dict`, containing parameters that :py:mod:`psycopg2` (as
+argument, a :class:`dict`, containing parameters that :mod:`psycopg2` (as
 an implementation of DB-API 2.0) will bind to the query in a way that is safe
 against `SQL injection`_. (This is inspired by old-style Python string
 formatting, but it is not the same.)
@@ -87,16 +87,16 @@ Context Managers
 ++++++++++++++++
 
 Eighty percent of your database usage should be covered by the simple
-:py:meth:`~postgres.Postgres.run`, :py:meth:`~postgres.Postgres.one`,
-:py:meth:`~postgres.Postgres.all` API introduced above. For the other 20%,
-:py:mod:`postgres` provides two context managers for working at increasingly
+:meth:`~postgres.Postgres.run`, :meth:`~postgres.Postgres.one`,
+:meth:`~postgres.Postgres.all` API introduced above. For the other 20%,
+:mod:`postgres` provides two context managers for working at increasingly
 lower levels of abstraction. The lowest level of abstraction in
-:py:mod:`postgres` is a :py:mod:`psycopg2` `connection pool
+:mod:`postgres` is a :mod:`psycopg2` `connection pool
 <http://initd.org/psycopg/docs/pool.html>`_ that we configure and manage for
-you. Everything in :py:mod:`postgres`, both the simple API and the context
+you. Everything in :mod:`postgres`, both the simple API and the context
 managers, uses this connection pool.
 
-Use the :py:func:`~postgres.Postgres.get_cursor` context manager to work
+Use the :func:`~postgres.Postgres.get_cursor` context manager to work
 directly with a `simple cursor`_, while still taking advantage of connection
 pooling and automatic transaction management:
 
@@ -118,13 +118,13 @@ of your code block, when the context manager commits the transaction for you::
     >>> db.all("SELECT * FROM foo ORDER BY bar")
     [Record(bar='bit', baz=537), Record(bar='blam', baz=None), Record(bar='buz', baz=42)]
 
-The :py:func:`~postgres.Postgres.get_cursor` method gives you a context manager
-that wraps a `simple cursor`_. It has :py:attr:`autocommit` turned off on its
+The :func:`~postgres.Postgres.get_cursor` method gives you a context manager
+that wraps a `simple cursor`_. It has :attr:`autocommit` turned off on its
 connection.  If the block under management raises an exception, the connection
 is rolled back. Otherwise it's committed. Use this when you want a series of
 statements to be part of one transaction, but you don't need fine-grained
 control over the transaction. For fine-grained control, use
-:py:func:`~postgres.Postgres.get_connection` to get a connection straight from
+:func:`~postgres.Postgres.get_connection` to get a connection straight from
 the connection pool:
 
     >>> db.run("DELETE FROM foo WHERE bar='blam'")
@@ -134,11 +134,11 @@ the connection pool:
     ...
     [Record(bar='bit', baz=537), Record(bar='buz', baz=42)]
 
-A connection gotten in this way will have :py:attr:`autocommit` turned off, and
+A connection gotten in this way will have :attr:`autocommit` turned off, and
 it'll never be implicitly committed otherwise. It'll actually be rolled back
 when you're done with it, so it's up to you to explicitly commit as needed.
-This is the lowest-level abstraction that :py:mod:`postgres` provides,
-basically just a pre-configured connection pool from :py:mod:`psycopg2` that
+This is the lowest-level abstraction that :mod:`postgres` provides,
+basically just a pre-configured connection pool from :mod:`psycopg2` that
 uses `simple cursors`_.
 
 .. _simple cursor: #simple-cursors
@@ -277,44 +277,44 @@ class Postgres(object):
     :param int minconn: The minimum size of the connection pool
     :param int maxconn: The maximum size of the connection pool
     :param cursor_factory: Defaults to
-        :py:class:`~postgres.cursors.SimpleNamedTupleCursor`
+        :class:`~postgres.cursors.SimpleNamedTupleCursor`
 
-    This is the main object that :py:mod:`postgres` provides, and you should
+    This is the main object that :mod:`postgres` provides, and you should
     have one instance per process for each PostgreSQL database your process
     wants to talk to using this library.
 
     >>> import postgres
     >>> db = postgres.Postgres("postgres://jrandom@localhost/test")
 
-    (Note that importing :py:mod:`postgres` under Python 2 will cause the
-    registration of typecasters with :py:mod:`psycopg2` to ensure that you get
+    (Note that importing :mod:`postgres` under Python 2 will cause the
+    registration of typecasters with :mod:`psycopg2` to ensure that you get
     unicode instead of bytestrings for text data, according to `this advice`_.)
 
     When instantiated, this object creates a `thread-safe connection pool
     <http://initd.org/psycopg/docs/pool.html#psycopg2.pool.ThreadedConnectionPool>`_,
-    which opens :py:attr:`minconn` connections immediately, and up to
-    :py:attr:`maxconn` according to demand. Everything this object provides
+    which opens :attr:`minconn` connections immediately, and up to
+    :attr:`maxconn` according to demand. Everything this object provides
     runs through this connection pool.
 
-    :py:attr:`cursor_factory` sets the default cursor that connections managed
-    by this :py:class:`~postgres.Postgres` instance will use. See the
+    :attr:`cursor_factory` sets the default cursor that connections managed
+    by this :class:`~postgres.Postgres` instance will use. See the
     :ref:`simple-cursors` documentation below for additional options. Whatever
     default you set here, you can override that default on a per-call basis by
-    passing :py:attr:`back_as` or :py:attr:`cursor_factory` to
-    :py:meth:`~postgres.Postgres.one`, :py:meth:`~postgres.Postgres.all`, and
-    :py:meth:`~postgres.Postgres.get_cursor`.
+    passing :attr:`back_as` or :attr:`cursor_factory` to
+    :meth:`~postgres.Postgres.one`, :meth:`~postgres.Postgres.all`, and
+    :meth:`~postgres.Postgres.get_cursor`.
 
-    The names in our simple API, :py:meth:`~postgres.Postgres.run`,
-    :py:meth:`~postgres.Postgres.one`, and :py:meth:`~postgres.Postgres.all`,
+    The names in our simple API, :meth:`~postgres.Postgres.run`,
+    :meth:`~postgres.Postgres.one`, and :meth:`~postgres.Postgres.all`,
     were chosen to be short and memorable, and to not directly conflict with
-    the DB-API 2.0 :py:meth:`execute`, :py:meth:`fetchone`, and
-    :py:meth:`fetchall` methods, which have slightly different semantics (under
-    DB-API 2.0 you call :py:meth:`execute` on a cursor and then call one of the
-    :py:meth:`fetch*` methods on the same cursor to retrieve records; with our
-    simple API there is no second :py:meth:`fetch` step, and we also provide
+    the DB-API 2.0 :meth:`execute`, :meth:`fetchone`, and
+    :meth:`fetchall` methods, which have slightly different semantics (under
+    DB-API 2.0 you call :meth:`execute` on a cursor and then call one of the
+    :meth:`fetch*` methods on the same cursor to retrieve records; with our
+    simple API there is no second :meth:`fetch` step, and we also provide
     automatic dereferencing). See issues `16`_ and `20`_ for more of the
     rationale behind these names. The context managers on this class are named
-    starting with :py:meth:`get_` to set them apart from the simple-case API.
+    starting with :meth:`get_` to set them apart from the simple-case API.
 
     .. _16: https://github.com/gratipay/postgres.py/issues/16
     .. _20: https://github.com/gratipay/postgres.py/issues/20
@@ -355,9 +355,9 @@ class Postgres(object):
         :param string sql: the SQL statement to execute
         :param parameters: the `bind parameters`_ for the SQL statement
         :type parameters: dict or tuple
-        :param a: passed through to :py:meth:`~postgres.Postgres.get_cursor`
-        :param kw: passed through to :py:meth:`~postgres.Postgres.get_cursor`
-        :returns: :py:const:`None`
+        :param a: passed through to :meth:`~postgres.Postgres.get_cursor`
+        :param kw: passed through to :meth:`~postgres.Postgres.get_cursor`
+        :returns: :const:`None`
 
         .. _bind parameters: #bind-parameters
 
@@ -387,13 +387,13 @@ class Postgres(object):
         :param default: the value to return or raise if no results are found
         :param back_as: the type of record to return
         :type back_as: type or string
-        :param a: passed through to :py:meth:`~postgres.Postgres.get_cursor`
-        :param kw: passed through to :py:meth:`~postgres.Postgres.get_cursor`
-        :returns: a single record or value, or :py:attr:`default` (if
-            :py:attr:`default` is not an :py:class:`Exception`)
-        :raises: :py:exc:`~postgres.TooFew` or :py:exc:`~postgres.TooMany`,
-            or :py:attr:`default` (if :py:attr:`default` is an
-            :py:class:`Exception`)
+        :param a: passed through to :meth:`~postgres.Postgres.get_cursor`
+        :param kw: passed through to :meth:`~postgres.Postgres.get_cursor`
+        :returns: a single record or value, or :attr:`default` (if
+            :attr:`default` is not an :class:`Exception`)
+        :raises: :exc:`~postgres.TooFew` or :exc:`~postgres.TooMany`,
+            or :attr:`default` (if :attr:`default` is an
+            :class:`Exception`)
 
         .. _bind parameters: #bind-parameters
 
@@ -408,7 +408,7 @@ class Postgres(object):
         >>> db.one("SELECT * FROM foo WHERE bar='buz'")
         Record(bar='buz', baz=42)
 
-        If the record doesn't exist, we return :py:class:`None`:
+        If the record doesn't exist, we return :class:`None`:
 
         >>> record = db.one("SELECT * FROM foo WHERE bar='blam'")
         >>> if record is None:
@@ -416,14 +416,14 @@ class Postgres(object):
         ...
         No blam yet.
 
-        If you pass :py:attr:`default` we'll return that instead of
-        :py:class:`None`:
+        If you pass :attr:`default` we'll return that instead of
+        :class:`None`:
 
         >>> db.one("SELECT * FROM foo WHERE bar='blam'", default=False)
         False
 
-        If you pass an :py:class:`Exception` instance or subclass for
-        :py:attr:`default`, we will raise that for you:
+        If you pass an :class:`Exception` instance or subclass for
+        :attr:`default`, we will raise that for you:
 
         >>> db.one("SELECT * FROM foo WHERE bar='blam'", default=Exception)
         Traceback (most recent call last):
@@ -431,13 +431,13 @@ class Postgres(object):
         Exception
 
         We specifically stop short of supporting lambdas or other callables for
-        the :py:attr:`default` parameter. That gets complicated quickly, and
+        the :attr:`default` parameter. That gets complicated quickly, and
         it's easy to just check the return value in the caller and do your
         extra logic there.
 
-        You can use :py:attr:`back_as` to override the type associated with the
-        default :py:attr:`cursor_factory` for your
-        :py:class:`~postgres.Postgres` instance:
+        You can use :attr:`back_as` to override the type associated with the
+        default :attr:`cursor_factory` for your
+        :class:`~postgres.Postgres` instance:
 
         >>> db.default_cursor_factory
         <class 'postgres.cursors.SimpleNamedTupleCursor'>
@@ -447,11 +447,11 @@ class Postgres(object):
         {'bar': 'buz', 'baz': 42}
 
         That's a convenience so you don't have to go to the trouble of
-        remembering where :py:class:`~postgres.cursors.SimpleDictCursor` lives
+        remembering where :class:`~postgres.cursors.SimpleDictCursor` lives
         and importing it in order to get dictionaries back. If you do need more
         control (maybe you have a custom cursor class), you can pass
-        :py:attr:`cursor_factory` explicitly, and that will override any
-        :py:attr:`back_as`:
+        :attr:`cursor_factory` explicitly, and that will override any
+        :attr:`back_as`:
 
         >>> from postgres.cursors import SimpleTupleCursor
         >>> db.one( "SELECT * FROM foo WHERE bar='buz'"
@@ -466,13 +466,13 @@ class Postgres(object):
         >>> db.one("SELECT baz FROM foo WHERE bar='buz'")
         42
 
-        And if the dereferenced value is :py:class:`None`, we return the value
-        of :py:attr:`default`:
+        And if the dereferenced value is :class:`None`, we return the value
+        of :attr:`default`:
 
         >>> db.one("SELECT sum(baz) FROM foo WHERE bar='nope'", default=0)
         0
 
-        Dereferencing will use :py:meth:`.values` if it exists on the record,
+        Dereferencing will use :meth:`.values` if it exists on the record,
         so it should work for both mappings and sequences.
 
         >>> db.one( "SELECT sum(baz) FROM foo WHERE bar='nope'"
@@ -494,9 +494,9 @@ class Postgres(object):
         :type parameters: dict or tuple
         :param back_as: the type of record to return
         :type back_as: type or string
-        :param a: passed through to :py:meth:`~postgres.Postgres.get_cursor`
-        :param kw: passed through to :py:meth:`~postgres.Postgres.get_cursor`
-        :returns: :py:class:`list` of records or :py:class:`list` of single
+        :param a: passed through to :meth:`~postgres.Postgres.get_cursor`
+        :param kw: passed through to :meth:`~postgres.Postgres.get_cursor`
+        :returns: :class:`list` of records or :class:`list` of single
             values
 
         .. _bind parameters: #bind-parameters
@@ -511,9 +511,9 @@ class Postgres(object):
         >>> db.all("SELECT * FROM foo ORDER BY bar")
         [Record(bar='bit', baz=537), Record(bar='buz', baz=42)]
 
-        You can use :py:attr:`back_as` to override the type associated with the
-        default :py:attr:`cursor_factory` for your
-        :py:class:`~postgres.Postgres` instance:
+        You can use :attr:`back_as` to override the type associated with the
+        default :attr:`cursor_factory` for your
+        :class:`~postgres.Postgres` instance:
 
         >>> db.default_cursor_factory
         <class 'postgres.cursors.SimpleNamedTupleCursor'>
@@ -521,11 +521,11 @@ class Postgres(object):
         [{'bar': 'bit', 'baz': 537}, {'bar': 'buz', 'baz': 42}]
 
         That's a convenience so you don't have to go to the trouble of
-        remembering where :py:class:`~postgres.cursors.SimpleDictCursor` lives
+        remembering where :class:`~postgres.cursors.SimpleDictCursor` lives
         and importing it in order to get dictionaries back. If you do need more
         control (maybe you have a custom cursor class), you can pass
-        :py:attr:`cursor_factory` explicitly, and that will override any
-        :py:attr:`back_as`:
+        :attr:`cursor_factory` explicitly, and that will override any
+        :attr:`back_as`:
 
         >>> from postgres.cursors import SimpleTupleCursor
         >>> db.all( "SELECT * FROM foo ORDER BY bar"
@@ -541,7 +541,7 @@ class Postgres(object):
         [537, 42]
 
         This works for record types that are mappings (anything with a
-        :py:meth:`__len__` and a :py:meth:`values` method) as well those that
+        :meth:`__len__` and a :meth:`values` method) as well those that
         are sequences:
 
         >>> db.all("SELECT baz FROM foo ORDER BY bar", back_as=dict)
@@ -553,21 +553,21 @@ class Postgres(object):
 
 
     def get_cursor(self, *a, **kw):
-        """Return a :py:class:`~postgres.CursorContextManager` that uses
+        """Return a :class:`~postgres.CursorContextManager` that uses
         our connection pool.
 
-        :param a: passed through to the :py:meth:`cursor` method of instances
-            of the class returned by :py:func:`~postgres.make_Connection`
-        :param kw: passed through to the :py:meth:`cursor` method of instances
-            of the class returned by :py:func:`~postgres.make_Connection`
+        :param a: passed through to the :meth:`cursor` method of instances
+            of the class returned by :func:`~postgres.make_Connection`
+        :param kw: passed through to the :meth:`cursor` method of instances
+            of the class returned by :func:`~postgres.make_Connection`
 
         >>> with db.get_cursor() as cursor:
         ...     cursor.all("SELECT * FROM foo")
         ...
         [Record(bar='buz', baz=42), Record(bar='bit', baz=537)]
 
-        You can use our simple :py:meth:`~postgres.Postgres.run`,
-        :py:meth:`~postgres.Postgres.one`, :py:meth:`~postgres.Postgres.all`
+        You can use our simple :meth:`~postgres.Postgres.run`,
+        :meth:`~postgres.Postgres.one`, :meth:`~postgres.Postgres.all`
         API, and you can also use the traditional DB-API 2.0 methods:
 
         >>> with db.get_cursor() as cursor:
@@ -576,11 +576,11 @@ class Postgres(object):
         ...
         [Record(bar='buz', baz=42), Record(bar='bit', baz=537)]
 
-        The cursor will have :py:attr:`autocommit` turned off on its
-        connection. If your code block inside the :py:obj:`with` statement
+        The cursor will have :attr:`autocommit` turned off on its
+        connection. If your code block inside the :obj:`with` statement
         raises an exception, the transaction will be rolled back. Otherwise,
         it'll be committed. The context manager closes the cursor when the
-        block ends, resets :py:attr:`autocommit` to off on the connection, and
+        block ends, resets :attr:`autocommit` to off on the connection, and
         puts the connection back in the pool. The cursor is destroyed after
         use.
 
@@ -593,7 +593,7 @@ class Postgres(object):
 
 
     def get_connection(self):
-        """Return a :py:class:`~postgres.ConnectionContextManager` that uses
+        """Return a :class:`~postgres.ConnectionContextManager` that uses
         our connection pool.
 
         >>> with db.get_connection() as connection:
@@ -603,8 +603,8 @@ class Postgres(object):
         [Record(bar='buz', baz=42), Record(bar='bit', baz=537)]
 
         Use this when you want to take advantage of connection pooling and our
-        simple :py:meth:`~postgres.Postgres.run`,
-        :py:meth:`~postgres.Postgres.one`, :py:meth:`~postgres.Postgres.all`
+        simple :meth:`~postgres.Postgres.run`,
+        :meth:`~postgres.Postgres.one`, :meth:`~postgres.Postgres.all`
         API, but otherwise need full control, for example, to do complex things
         with transactions.
 
@@ -625,23 +625,23 @@ class Postgres(object):
     def register_model(self, ModelSubclass, typname=None):
         """Register an ORM model.
 
-        :param ModelSubclass: the :py:class:`~postgres.orm.Model` subclass to
-            register with this :py:class:`~postgres.Postgres` instance
+        :param ModelSubclass: the :class:`~postgres.orm.Model` subclass to
+            register with this :class:`~postgres.Postgres` instance
 
         :param typname: a string indicating the Postgres type to register this
             model for (``typname``, without an "e," is the name of the relevant
-            column in the underlying ``pg_type`` table). If :py:class:`None`,
-            we'll look for :py:attr:`ModelSubclass.typname`.
+            column in the underlying ``pg_type`` table). If :class:`None`,
+            we'll look for :attr:`ModelSubclass.typname`.
 
-        :raises: :py:exc:`~postgres.NotAModel`,
-            :py:exc:`~postgres.NoTypeSpecified`,
-            :py:exc:`~postgres.NoSuchType`,
-            :py:exc:`~postgres.AlreadyRegistered`
+        :raises: :exc:`~postgres.NotAModel`,
+            :exc:`~postgres.NoTypeSpecified`,
+            :exc:`~postgres.NoSuchType`,
+            :exc:`~postgres.AlreadyRegistered`
 
         .. note::
 
-            See the :py:mod:`~postgres.orm` docs for instructions on
-            subclassing :py:class:`~postgres.orm.Model`.
+            See the :mod:`~postgres.orm` docs for instructions on
+            subclassing :class:`~postgres.orm.Model`.
 
         """
         self._validate_model_subclass(ModelSubclass)
@@ -682,12 +682,12 @@ class Postgres(object):
     def unregister_model(self, ModelSubclass):
         """Unregister an ORM model.
 
-        :param ModelSubclass: the :py:class:`~postgres.orm.Model` subclass to
+        :param ModelSubclass: the :class:`~postgres.orm.Model` subclass to
             unregister
-        :raises: :py:exc:`~postgres.NotAModel`,
-            :py:exc:`~postgres.NotRegistered`
+        :raises: :exc:`~postgres.NotAModel`,
+            :exc:`~postgres.NotRegistered`
 
-        If :py:class:`ModelSubclass` is registered for multiple types, it is
+        If :class:`ModelSubclass` is registered for multiple types, it is
         unregistered for all of them.
 
         """
@@ -702,19 +702,19 @@ class Postgres(object):
     def check_registration(self, ModelSubclass, include_subsubclasses=False):
         """Check whether an ORM model is registered.
 
-        :param ModelSubclass: the :py:class:`~postgres.orm.Model` subclass to
+        :param ModelSubclass: the :class:`~postgres.orm.Model` subclass to
             check for
         :param bool include_subsubclasses: whether to also check for subclasses
-            of :py:class:`ModelSubclass` or just :py:class:`ModelSubclass`
+            of :class:`ModelSubclass` or just :class:`ModelSubclass`
             itself
 
-        :returns: the :py:attr:`typname` (a string) for which this model is
+        :returns: the :attr:`typname` (a string) for which this model is
             registered, or a list of strings if it's registered for multiple
             types
 
         :rettype: string
-        :raises: :py:exc:`~postgres.NotAModel`,
-            :py:exc:`~postgres.NotRegistered`
+        :raises: :exc:`~postgres.NotAModel`,
+            :exc:`~postgres.NotRegistered`
 
         """
         self._validate_model_subclass(ModelSubclass)
@@ -743,30 +743,30 @@ class Postgres(object):
 
 def make_Connection(postgres):
     """Define and return a subclass of
-    :py:class:`psycopg2.extensions.connection`.
+    :class:`psycopg2.extensions.connection`.
 
-    :param postgres: the :py:class:`~postgres.Postgres` instance to bind to
-    :returns: a :py:class:`Connection` class
+    :param postgres: the :class:`~postgres.Postgres` instance to bind to
+    :returns: a :class:`Connection` class
 
     The class defined and returned here will be linked to the instance of
-    :py:class:`~postgres.Postgres` that is passed in as :py:attr:`postgres`,
-    which will use this class as the :py:attr:`connection_factory` for its
+    :class:`~postgres.Postgres` that is passed in as :attr:`postgres`,
+    which will use this class as the :attr:`connection_factory` for its
     connection pool.
 
-    The :py:meth:`cursor` method of this class accepts a :py:attr:`back_as`
-    keyword argument. If a :py:attr:`cursor_factory` keyword argument is also
-    given, then any :py:attr:`back_as` is ignored and discarded.  Valid values
-    for :py:attr:`back_as` are :py:class:`tuple`, :py:class:`namedtuple`,
-    :py:class:`dict` (or the strings ``tuple``, ``namedtuple``, and ``dict``),
-    and :py:class:`None`. If the value of :py:attr:`back_as` is
-    :py:class:`None`, then we'll use the default :py:attr:`cursor_factory` with
-    which our parent :py:class:`~postgres.Postgres` instance was instantiated.
-    If :py:attr:`back_as` is not :py:class:`None`, then we'll specify a
-    :py:attr:`cursor_factory` that will result in records of the designated
-    type: :py:class:`postgres.cursor.SimpleTupleCursor` for :py:class:`tuple`,
-    :py:class:`postgres.cursor.SimpleNamedTupleCursor` for
-    :py:class:`namedtuple`, and :py:class:`postgres.cursor.SimpleDictCursor`
-    for :py:class:`dict`.
+    The :meth:`cursor` method of this class accepts a :attr:`back_as`
+    keyword argument. If a :attr:`cursor_factory` keyword argument is also
+    given, then any :attr:`back_as` is ignored and discarded.  Valid values
+    for :attr:`back_as` are :class:`tuple`, :class:`namedtuple`,
+    :class:`dict` (or the strings ``tuple``, ``namedtuple``, and ``dict``),
+    and :class:`None`. If the value of :attr:`back_as` is
+    :class:`None`, then we'll use the default :attr:`cursor_factory` with
+    which our parent :class:`~postgres.Postgres` instance was instantiated.
+    If :attr:`back_as` is not :class:`None`, then we'll specify a
+    :attr:`cursor_factory` that will result in records of the designated
+    type: :class:`postgres.cursor.SimpleTupleCursor` for :class:`tuple`,
+    :class:`postgres.cursor.SimpleNamedTupleCursor` for
+    :class:`namedtuple`, and :class:`postgres.cursor.SimpleDictCursor`
+    for :class:`dict`.
 
     We also set client encoding to ``UTF-8``.
 
@@ -815,16 +815,16 @@ def make_Connection(postgres):
 
 
 def make_DelegatingCaster(postgres):
-    """Define a :py:class:`~psycopg2.extras.CompositeCaster` subclass that
-        delegates to :py:attr:`~postgres.Postgres.model_registry`.
+    """Define a :class:`~psycopg2.extras.CompositeCaster` subclass that
+        delegates to :attr:`~postgres.Postgres.model_registry`.
 
-    :param postgres: the :py:class:`~postgres.Postgres` instance to bind to
-    :returns: a :py:class:`DelegatingCaster` class
+    :param postgres: the :class:`~postgres.Postgres` instance to bind to
+    :returns: a :class:`DelegatingCaster` class
 
-    The class we return will use the :py:attr:`model_registry` of the given
-    :py:class:`~postgres.Postgres` instance to look up a
-    :py:class:`~postgres.orm.Model` subclass to use in mapping
-    :py:mod:`psycopg2` return values to higher-order Python objects. Yeah, it's
+    The class we return will use the :attr:`model_registry` of the given
+    :class:`~postgres.Postgres` instance to look up a
+    :class:`~postgres.orm.Model` subclass to use in mapping
+    :mod:`psycopg2` return values to higher-order Python objects. Yeah, it's
     a little squirrelly. :-/
 
     """

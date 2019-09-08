@@ -1,8 +1,8 @@
 """
 
-The :py:mod:`postgres` library extends the cursors provided by
-:py:mod:`psycopg2` to add simpler API methods: :py:meth:`run`, :py:meth:`one`,
-and :py:meth:`all`.
+The :mod:`postgres` library extends the cursors provided by
+:mod:`psycopg2` to add simpler API methods: :meth:`run`, :meth:`one`,
+and :meth:`all`.
 
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -44,9 +44,9 @@ class SimpleCursorBase(object):
     """
 
     This is a mixin to provide a simpler API atop the usual DB-API 2.0 API
-    provided by :py:mod:`psycopg2`. Any custom cursor class you would like to
-    use as the :py:attr:`cursor_factory` argument to
-    :py:class:`~postgres.Postgres` must subclass this base.
+    provided by :mod:`psycopg2`. Any custom cursor class you would like to
+    use as the :attr:`cursor_factory` argument to
+    :class:`~postgres.Postgres` must subclass this base.
 
     >>> from psycopg2.extras import LoggingCursor
     >>> from postgres.cursors import SimpleCursorBase
@@ -59,8 +59,8 @@ class SimpleCursorBase(object):
     ...               )
 
     If you try to use a cursor that doesn't subclass
-    :py:class:`~postgres.cursors.SimpleCursorBase` as the default
-    :py:attr:`cursor_factory` for a :py:class:`~postgres.Postgres` instance, we
+    :class:`~postgres.cursors.SimpleCursorBase` as the default
+    :attr:`cursor_factory` for a :class:`~postgres.Postgres` instance, we
     won't let you:
 
     >>> db = Postgres( "postgres://jrandom@localhost/test"
@@ -72,7 +72,7 @@ class SimpleCursorBase(object):
     postgres.NotASimpleCursor: We can only work with subclasses of postgres.cursors.SimpleCursorBase. LoggingCursor doesn't fit the bill.
 
     However, we do allow you to use whatever you want as the
-    :py:attr:`cursor_factory` argument for individual calls:
+    :attr:`cursor_factory` argument for individual calls:
 
     >>> db.all("SELECT * FROM foo", cursor_factory=LoggingCursor)
     Traceback (most recent call last):
@@ -86,7 +86,7 @@ class SimpleCursorBase(object):
 
         .. note::
 
-            See the documentation at :py:meth:`postgres.Postgres.run`.
+            See the documentation at :meth:`postgres.Postgres.run`.
 
         """
         self.execute(sql, parameters)
@@ -97,7 +97,7 @@ class SimpleCursorBase(object):
 
         .. note::
 
-            See the documentation at :py:meth:`postgres.Postgres.one`.
+            See the documentation at :meth:`postgres.Postgres.one`.
 
         """
 
@@ -139,7 +139,7 @@ class SimpleCursorBase(object):
 
         .. note::
 
-            See the documentation at :py:meth:`postgres.Postgres.all`.
+            See the documentation at :meth:`postgres.Postgres.all`.
 
         """
         self.execute(sql, parameters)
@@ -167,7 +167,7 @@ class SimpleDictCursor(SimpleCursorBase, RealDictCursor):
 
 def isexception(obj):
     """Given an object, return a boolean indicating whether it is an instance
-    or subclass of :py:class:`Exception`.
+    or subclass of :class:`Exception`.
     """
     if isinstance(obj, Exception):
         return True

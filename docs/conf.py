@@ -86,6 +86,9 @@ pygments_style = 'sphinx'
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
 
+# Get rid of the need for `py:` prefixes everywhere.
+primary_domain = 'py'
+
 
 # -- Options for HTML output ---------------------------------------------------
 
