@@ -276,6 +276,8 @@ class Postgres(object):
         <http://www.postgresql.org/docs/current/static/libpq-connect.html>`_
     :param int minconn: The minimum size of the connection pool
     :param int maxconn: The maximum size of the connection pool
+    :param bool readonly: Setting this to :obj:`True` makes all connections and
+        cursors readonly by default.
     :param cursor_factory: Defaults to
         :class:`~postgres.cursors.SimpleNamedTupleCursor`
 
@@ -326,13 +328,14 @@ class Postgres(object):
 
     """
 
-    def __init__(self, url='', minconn=1, maxconn=10, \
-                                        cursor_factory=SimpleNamedTupleCursor):
+    def __init__(self, url='', minconn=1, maxconn=10, readonly=False,
+                 cursor_factory=SimpleNamedTupleCursor):
         if url.startswith("postgres://"):
             dsn = url_to_dsn(url)
         else:
             dsn = url
 
+        self.readonly = readonly
 
         # Set up connection pool.
         # =======================
@@ -586,6 +589,7 @@ class Postgres(object):
         transaction.
 
         """
+        kw.setdefault('readonly', self.readonly)
         return CursorContextManager(self.pool, **kw)
 
 
@@ -618,6 +622,7 @@ class Postgres(object):
         [Record(bar='buz', baz=42), Record(bar='bit', baz=537)]
 
         """
+        kw.setdefault('readonly', self.readonly)
         return ConnectionContextManager(self.pool, **kw)
 
 
