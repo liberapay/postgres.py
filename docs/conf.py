@@ -25,7 +25,7 @@ import sys, os
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.intersphinx', 'sphinx.ext.viewcode']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -88,6 +88,12 @@ pygments_style = 'sphinx'
 
 # Get rid of the need for `py:` prefixes everywhere.
 primary_domain = 'py'
+
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3.7/', None),
+    'psycopg2': ('http://initd.org/psycopg/docs/', None),
+}
+
 
 
 # -- Options for HTML output ---------------------------------------------------
