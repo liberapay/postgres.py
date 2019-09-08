@@ -125,17 +125,6 @@ class SimpleCursorBase(object):
         return out
 
 
-    def _some(self, sql, parameters, lo, hi):
-        self.execute(sql, parameters)
-
-        if self.rowcount < lo:
-            raise TooFew(self.rowcount, lo, hi)
-        elif self.rowcount > hi:
-            raise TooMany(self.rowcount, lo, hi)
-
-        return self.fetchall()
-
-
     def all(self, sql, parameters=None):
         """Execute a query and return all results.
 

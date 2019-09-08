@@ -101,29 +101,11 @@ class TestWrongNumberException(WithData):
         assert actual == "Got -1 rows; expecting 0 or 1."
 
     def test_TooMany_message_is_helpful_for_two_options(self):
-        try:
-            with self.db.get_cursor() as cursor:
-                actual = cursor._some( "SELECT * FROM foo"
-                                     , parameters=None
-                                     , lo=1
-                                     , hi=1
-                                      )
-        except TooMany as exc:
-            actual = str(exc)
+        actual = str(TooMany(2, 1, 1))
         assert actual == "Got 2 rows; expecting exactly 1."
 
     def test_TooMany_message_is_helpful_for_a_range(self):
-        self.db.run("INSERT INTO foo VALUES ('blam')")
-        self.db.run("INSERT INTO foo VALUES ('blim')")
-        try:
-            with self.db.get_cursor() as cursor:
-                actual = cursor._some( "SELECT * FROM foo"
-                                     , parameters=None
-                                     , lo=1
-                                     , hi=3
-                                      )
-        except TooMany as exc:
-            actual = str(exc)
+        actual = str(TooMany(4, 1, 3))
         assert actual == "Got 4 rows; expecting between 1 and 3 (inclusive)."
 
 
