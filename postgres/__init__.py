@@ -349,13 +349,12 @@ class Postgres(object):
         self.DelegatingCaster = make_DelegatingCaster(self)
 
 
-    def run(self, sql, parameters=None, *a, **kw):
+    def run(self, sql, parameters=None, **kw):
         """Execute a query and discard any results.
 
         :param string sql: the SQL statement to execute
         :param parameters: the `bind parameters`_ for the SQL statement
         :type parameters: dict or tuple
-        :param a: passed through to :meth:`~postgres.Postgres.get_cursor`
         :param kw: passed through to :meth:`~postgres.Postgres.get_cursor`
         :returns: :const:`None`
 
@@ -363,7 +362,7 @@ class Postgres(object):
 
         This is a convenience method. Here is what it does::
 
-            with self.get_cursor(*a, **kw) as cursor:
+            with self.get_cursor(**kw) as cursor:
                 cursor.run(sql, parameters)
 
         Use it like this:
@@ -374,11 +373,11 @@ class Postgres(object):
         >>> db.run("INSERT INTO foo VALUES ('bit', 537)")
 
         """
-        with self.get_cursor(*a, **kw) as cursor:
+        with self.get_cursor(**kw) as cursor:
             cursor.run(sql, parameters)
 
 
-    def one(self, sql, parameters=None, default=None, back_as=None, *a, **kw):
+    def one(self, sql, parameters=None, default=None, back_as=None, **kw):
         """Execute a query and return a single result or a default value.
 
         :param string sql: the SQL statement to execute
@@ -387,7 +386,6 @@ class Postgres(object):
         :param default: the value to return or raise if no results are found
         :param back_as: the type of record to return
         :type back_as: type or string
-        :param a: passed through to :meth:`~postgres.Postgres.get_cursor`
         :param kw: passed through to :meth:`~postgres.Postgres.get_cursor`
         :returns: a single record or value, or :attr:`default` (if
             :attr:`default` is not an :class:`Exception`)
@@ -399,7 +397,7 @@ class Postgres(object):
 
         This is a convenience method. Here is what it does::
 
-            with self.get_cursor(back_as=back_as, *a, **kw) as cursor:
+            with self.get_cursor(back_as=back_as, **kw) as cursor:
                 return cursor.one(sql, parameters, default)
 
         Use this for the common case where there should only be one record, but
@@ -482,11 +480,11 @@ class Postgres(object):
         0
 
         """
-        with self.get_cursor(back_as=back_as, *a, **kw) as cursor:
+        with self.get_cursor(back_as=back_as, **kw) as cursor:
             return cursor.one(sql, parameters, default)
 
 
-    def all(self, sql, parameters=None, back_as=None, *a, **kw):
+    def all(self, sql, parameters=None, back_as=None, **kw):
         """Execute a query and return all results.
 
         :param string sql: the SQL statement to execute
@@ -494,7 +492,6 @@ class Postgres(object):
         :type parameters: dict or tuple
         :param back_as: the type of record to return
         :type back_as: type or string
-        :param a: passed through to :meth:`~postgres.Postgres.get_cursor`
         :param kw: passed through to :meth:`~postgres.Postgres.get_cursor`
         :returns: :class:`list` of records or :class:`list` of single
             values
@@ -503,7 +500,7 @@ class Postgres(object):
 
         This is a convenience method. Here is what it does::
 
-            with self.get_cursor(back_as=back_as, *a, **kw) as cursor:
+            with self.get_cursor(back_as=back_as, **kw) as cursor:
                 return cursor.all(sql, parameters)
 
         Use it like this:
@@ -548,18 +545,14 @@ class Postgres(object):
         [537, 42]
 
         """
-        with self.get_cursor(back_as=back_as, *a, **kw) as cursor:
+        with self.get_cursor(back_as=back_as, **kw) as cursor:
             return cursor.all(sql, parameters)
 
 
-    def get_cursor(self, *a, **kw):
-        """Return a :class:`~postgres.CursorContextManager` that uses
-        our connection pool.
+    def get_cursor(self, **kw):
+        """Return a :class:`.CursorContextManager` that uses our connection pool.
 
-        :param a: passed through to the :meth:`cursor` method of instances
-            of the class returned by :func:`~postgres.make_Connection`
-        :param kw: passed through to the :meth:`cursor` method of instances
-            of the class returned by :func:`~postgres.make_Connection`
+        :param kw: passed through to :class:`.CursorContextManager`
 
         >>> with db.get_cursor() as cursor:
         ...     cursor.all("SELECT * FROM foo")
@@ -589,7 +582,7 @@ class Postgres(object):
         transaction.
 
         """
-        return CursorContextManager(self.pool, *a, **kw)
+        return CursorContextManager(self.pool, **kw)
 
 
     def get_connection(self):
