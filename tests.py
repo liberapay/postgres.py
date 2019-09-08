@@ -7,7 +7,7 @@ from unittest import TestCase
 from postgres import Postgres, NotAModel, NotRegistered
 from postgres.cursors import TooFew, TooMany, SimpleDictCursor
 from postgres.orm import ReadOnly, Model
-from psycopg2 import InterfaceError, ProgrammingError
+from psycopg2.errors import InterfaceError, ProgrammingError, ReadOnlySqlTransaction
 from pytest import mark, raises
 
 
@@ -211,6 +211,31 @@ class TestCursor(WithData):
             actual = cursor.execute(expected)
         del SimpleCursorBase.execute
         assert actual == expected
+
+    def test_autocommit_cursor(self):
+        try:
+            with self.db.get_cursor(autocommit=True) as cursor:
+                try:
+                    cursor.execute("INVALID QUERY")
+                except ProgrammingError:
+                    pass
+                cursor.execute("INSERT INTO foo VALUES ('blam')")
+                with self.db.get_cursor() as cursor:
+                    n = cursor.one("SELECT count(*) FROM foo")
+                    assert n == 3
+                raise KeyboardInterrupt()
+        except KeyboardInterrupt:
+            pass
+        with self.db.get_cursor() as cursor:
+            n = cursor.one("SELECT count(*) FROM foo")
+            assert n == 3
+
+    def test_readonly_cursor(self):
+        try:
+            with self.db.get_cursor(readonly=True) as cursor:
+                cursor.execute("INSERT INTO foo VALUES ('blam')")
+        except ReadOnlySqlTransaction:
+            pass
 
 
 # db.get_connection
