@@ -1,5 +1,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from psycopg2 import InterfaceError
+
 
 class CursorContextManager(object):
     """Instantiated once per :func:`~postgres.Postgres.get_cursor` call.
@@ -48,7 +50,10 @@ class CursorContextManager(object):
         elif exc_type is None and conn.readonly is False:
             conn.commit()
         else:
-            conn.rollback()
+            try:
+                conn.rollback()
+            except InterfaceError:
+                pass
         self.cursor.close()
         self.pool.putconn(conn)
 
@@ -85,5 +90,8 @@ class ConnectionContextManager(object):
     def __exit__(self, *exc_info):
         """Put our connection back in the pool.
         """
-        self.conn.rollback()
+        try:
+            self.conn.rollback()
+        except InterfaceError:
+            pass
         self.pool.putconn(self.conn)
