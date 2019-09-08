@@ -574,13 +574,12 @@ class Postgres(object):
         ...
         [Record(bar='buz', baz=42), Record(bar='bit', baz=537)]
 
-        The cursor will have :attr:`autocommit` turned off on its
+        By default the cursor will have :attr:`autocommit` turned off on its
         connection. If your code block inside the :obj:`with` statement
         raises an exception, the transaction will be rolled back. Otherwise,
         it'll be committed. The context manager closes the cursor when the
-        block ends, resets :attr:`autocommit` to off on the connection, and
-        puts the connection back in the pool. The cursor is destroyed after
-        use.
+        block ends and puts the connection back in the pool. The cursor is
+        destroyed after use.
 
         Use this when you want a series of statements to be part of one
         transaction, but you don't need fine-grained control over the
@@ -590,9 +589,11 @@ class Postgres(object):
         return CursorContextManager(self.pool, **kw)
 
 
-    def get_connection(self):
+    def get_connection(self, **kw):
         """Return a :class:`~postgres.ConnectionContextManager` that uses
         our connection pool.
+
+        :param kw: passed through to :class:`.ConnectionContextManager`
 
         >>> with db.get_connection() as connection:
         ...     cursor = connection.cursor()
@@ -617,7 +618,7 @@ class Postgres(object):
         [Record(bar='buz', baz=42), Record(bar='bit', baz=537)]
 
         """
-        return ConnectionContextManager(self.pool)
+        return ConnectionContextManager(self.pool, **kw)
 
 
     def register_model(self, ModelSubclass, typname=None):
