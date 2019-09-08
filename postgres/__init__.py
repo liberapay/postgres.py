@@ -32,7 +32,7 @@ Tutorial
 Instantiate a :class:`Postgres` object when your application starts:
 
     >>> from postgres import Postgres
-    >>> db = Postgres("postgres://jrandom@localhost/test")
+    >>> db = Postgres()
 
 Use :meth:`~postgres.Postgres.run` to run SQL statements:
 
@@ -284,7 +284,7 @@ class Postgres(object):
     wants to talk to using this library.
 
     >>> import postgres
-    >>> db = postgres.Postgres("postgres://jrandom@localhost/test")
+    >>> db = postgres.Postgres()
 
     (Note that importing :mod:`postgres` under Python 2 will cause the
     registration of typecasters with :mod:`psycopg2` to ensure that you get
@@ -866,7 +866,7 @@ def make_DelegatingCaster(postgres):
 
 
 if __name__ == '__main__':
-    db = Postgres("postgres://jrandom@localhost/test")
+    db = Postgres()
     db.run("DROP SCHEMA IF EXISTS public CASCADE")
     db.run("CREATE SCHEMA public")
     import doctest

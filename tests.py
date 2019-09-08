@@ -11,16 +11,13 @@ from psycopg2 import InterfaceError, ProgrammingError
 from pytest import mark, raises
 
 
-DATABASE_URL = os.environ['DATABASE_URL']
-
-
 # harnesses
 # =========
 
 class WithSchema(TestCase):
 
     def setUp(self):
-        self.db = Postgres(DATABASE_URL, cursor_factory=SimpleDictCursor)
+        self.db = Postgres(cursor_factory=SimpleDictCursor)
         self.db.run("DROP SCHEMA IF EXISTS public CASCADE")
         self.db.run("CREATE SCHEMA public")
 
@@ -367,7 +364,7 @@ class TestORM(WithData):
 class TestCursorFactory(WithData):
 
     def setUp(self):                    # override
-        self.db = Postgres(DATABASE_URL)
+        self.db = Postgres()
         self.db.run("DROP SCHEMA IF EXISTS public CASCADE")
         self.db.run("CREATE SCHEMA public")
         self.db.run("CREATE TABLE foo (bar text, baz int)")

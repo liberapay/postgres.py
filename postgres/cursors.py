@@ -54,18 +54,14 @@ class SimpleCursorBase(object):
     ...     pass
     ...
     >>> from postgres import Postgres
-    >>> db = Postgres( "postgres://jrandom@localhost/test"
-    ...              , cursor_factory=SimpleLoggingCursor
-    ...               )
+    >>> db = Postgres(cursor_factory=SimpleLoggingCursor)
 
     If you try to use a cursor that doesn't subclass
     :class:`~postgres.cursors.SimpleCursorBase` as the default
     :attr:`cursor_factory` for a :class:`~postgres.Postgres` instance, we
     won't let you:
 
-    >>> db = Postgres( "postgres://jrandom@localhost/test"
-    ...              , cursor_factory=LoggingCursor
-    ...               )
+    >>> db = Postgres(cursor_factory=LoggingCursor)
     ...
     Traceback (most recent call last):
         ...
@@ -178,7 +174,7 @@ def isexception(obj):
 
 if __name__ == '__main__':
     from postgres import Postgres
-    db = Postgres("postgres://jrandom@localhost/test")
+    db = Postgres()
     db.run("DROP SCHEMA IF EXISTS public CASCADE")
     db.run("CREATE SCHEMA public")
     import doctest

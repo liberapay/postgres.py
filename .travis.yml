@@ -10,7 +10,6 @@ install:
   - pip install pytest ./
 before_script:
   - psql -U postgres -c 'CREATE DATABASE "test";'
-  - psql -U postgres -c 'CREATE USER jrandom SUPERUSER;'
 script:
   - ./runtests.sh
 branches:
