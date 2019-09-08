@@ -8,13 +8,13 @@ Installation
 
     $ pip install postgres
 
-:mod:`postgres` requires `psycopg2`_ version 2.5 or higher.
+:mod:`postgres` requires `psycopg2`_ version 2.7.5 or higher.
 
-We `test <https://travis-ci.org/gratipay/postgres.py>`_ against Python 2.6, 2.7,
-3.2, and 3.3. We don't yet have a testing matrix for different versions of
+We `test <https://travis-ci.org/chadwhitacre/postgres.py>`_ against Python 2.7, 3.5,
+3.6, and 3.7. We don't yet have a testing matrix for different versions of
 :mod:`psycopg2` or PostgreSQL.
 
-:mod:`postgres` is in the `public domain`_.
+:mod:`postgres` is released under the `MIT license`_.
 
 
 See Also
@@ -148,10 +148,10 @@ The Postgres Object
 -------------------
 
 .. _psycopg2: http://initd.org/psycopg/
-.. _GitHub: https://github.com/gratipay/postgres.py
+.. _GitHub: https://github.com/chadwhitacre/postgres.py
 .. _PyPI: https://pypi.python.org/pypi/postgres
 .. _this advice: http://initd.org/psycopg/docs/usage.html#unicode-handling
-.. _public domain: http://creativecommons.org/publicdomain/zero/1.0/
+.. _MIT license: https://github.com/chadwhitacre/postgres.py/blob/master/LICENSE
 .. _sql: https://pypi.python.org/pypi/sql
 .. _Records: https://github.com/kennethreitz/records
 .. _DB-API 2.0: http://www.python.org/dev/peps/pep-0249/
@@ -316,8 +316,8 @@ class Postgres(object):
     rationale behind these names. The context managers on this class are named
     starting with :meth:`get_` to set them apart from the simple-case API.
 
-    .. _16: https://github.com/gratipay/postgres.py/issues/16
-    .. _20: https://github.com/gratipay/postgres.py/issues/20
+    .. _16: https://github.com/chadwhitacre/postgres.py/issues/16
+    .. _20: https://github.com/chadwhitacre/postgres.py/issues/20
 
     """
 
@@ -832,7 +832,7 @@ def make_DelegatingCaster(postgres):
 
         def parse(self, s, curs, retry=True):
             # Override to protect against race conditions:
-            #   https://github.com/gratipay/postgres.py/issues/26
+            #   https://github.com/chadwhitacre/postgres.py/issues/26
 
             try:
                 return super(DelegatingCaster, self).parse(s, curs)
