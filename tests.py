@@ -145,12 +145,39 @@ class TestOneOrZero(WithData):
         actual = self.db.one("SELECT * FROM foo WHERE bar='blam'")
         assert actual is None
 
-    def test_one_returns_whatever(self):
+    def test_one_returns_default(self):
         class WHEEEE: pass
         actual = self.db.one( "SELECT * FROM foo WHERE bar='blam'"
                             , default=WHEEEE
                              )
         assert actual is WHEEEE
+
+    def test_one_raises_default(self):
+        exception = RuntimeError('oops')
+        try:
+            actual = self.db.one( "SELECT * FROM foo WHERE bar='blam'"
+                                , default=exception
+                                 )
+        except Exception as e:
+            if e is not exception:
+                raise
+        else:
+            raise AssertionError('exception not raised')
+
+    def test_one_returns_default_after_derefencing(self):
+        default = 0
+        actual = self.db.one("SELECT NULL AS foo", default=default)
+        assert actual is default
+
+    def test_one_raises_default_after_derefencing(self):
+        exception = RuntimeError('oops')
+        try:
+            self.db.one("SELECT NULL AS foo", default=exception)
+        except Exception as e:
+            if e is not exception:
+                raise
+        else:
+            raise AssertionError('exception not raised')
 
     def test_one_returns_one(self):
         actual = self.db.one("SELECT * FROM foo WHERE bar='baz'")
