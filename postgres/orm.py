@@ -14,7 +14,7 @@ database usage.
 
 The fundamental technique we employ, introduced by `Michael Robbelard at PyOhio
 2013`_, is to write SQL queries that typecast results to table types, and then
-use a :py:mod:`psycopg2` :py:class:`~psycopg2.extra.CompositeCaster` to map
+use a :mod:`psycopg2` :class:`~psycopg2.extra.CompositeCaster` to map
 these to Python objects.  This means we get to define our schema in SQL, and we
 get to write our queries in SQL, and we get to explicitly indicate in our SQL
 queries how Python should map the results to objects, and then we can write
@@ -82,10 +82,10 @@ The same thing works for views::
 
     test=#
 
-:py:mod:`psycopg2` provides a :py:func:`~psycopg2.extras.register_composite`
+:mod:`psycopg2` provides a :func:`~psycopg2.extras.register_composite`
 function that lets us map PostgreSQL composite types to Python objects. This
 includes table and view types, and that is the basis for
-:py:mod:`postgres.orm`. We map based on types, not tables.
+:mod:`postgres.orm`. We map based on types, not tables.
 
 
 .. _orm-tutorial:
@@ -93,25 +93,25 @@ includes table and view types, and that is the basis for
 ORM Tutorial
 ------------
 
-First, write a Python class that subclasses :py:class:`~postgres.orm.Model`::
+First, write a Python class that subclasses :class:`~postgres.orm.Model`::
 
     >>> from postgres.orm import Model
     >>> class Foo(Model):
     ...     typname = "foo"
     ...
 
-Your model must have a :py:attr:`typname` attribute, which is the name of the
+Your model must have a :attr:`typname` attribute, which is the name of the
 PostgreSQL type for which this class is an object mapping. (``typname``,
 spelled without an "e," is the name of the relevant column in the ``pg_type``
 table in your database.)
 
-Second, register your model with your :py:class:`~postgres.Postgres` instance:
+Second, register your model with your :class:`~postgres.Postgres` instance:
 
     >>> db.register_model(Foo)
 
-That will plug your model into the :py:mod:`psycopg2` composite casting
+That will plug your model into the :mod:`psycopg2` composite casting
 machinery, and you'll now get instances of your model back from
-:py:meth:`~postgres.Postgres.one` and :py:meth:`~postgres.Postgres.all` when
+:meth:`~postgres.Postgres.one` and :meth:`~postgres.Postgres.all` when
 you cast to the relevant type in your query. If your query returns more than
 one column, you'll need to dereference the column containing the model just as
 with any other query:
@@ -125,7 +125,7 @@ with any other query:
     'blam'
 
 And as usual, if your query only returns one column, then
-:py:meth:`~postgres.Postgres.one` and :py:meth:`~postgres.Postgres.all`
+:meth:`~postgres.Postgres.one` and :meth:`~postgres.Postgres.all`
 will do the dereferencing for you:
 
     >>> foo = db.one("SELECT foo.*::foo FROM foo WHERE bar='blam'")
@@ -161,7 +161,7 @@ Then use that method to update the database:
     90210
 
 We never update your database for you. We also never sync your objects for you:
-note the use of the :py:meth:`~postgres.orm.Model.set_attributes` method to
+note the use of the :meth:`~postgres.orm.Model.set_attributes` method to
 sync our instance after modifying the database.
 
 
@@ -202,17 +202,17 @@ class NotRegistered(Exception):
 # =====
 
 class Model(object):
-    """This is the base class for models in :py:mod:`postgres.orm`.
+    """This is the base class for models in :mod:`postgres.orm`.
 
     :param dict record: The raw query result
 
-    Instances of subclasses of :py:class:`~postgres.orm.Model` will have an
+    Instances of subclasses of :class:`~postgres.orm.Model` will have an
     attribute for each field in the composite type for which the subclass is
     registered (for table and view types, these will be the columns of the
     table or view).  These attributes are read-only. We don't update your
     database. You are expected to do that yourself in methods on your subclass.
     To keep instance attributes in sync after a database update, use the
-    :py:meth:`~postgres.orm.Model.set_attributes` helper.
+    :meth:`~postgres.orm.Model.set_attributes` helper.
 
     """
 
@@ -233,13 +233,13 @@ class Model(object):
         return super(Model, self).__setattr__(name, value)
 
     def set_attributes(self, **kw):
-        """Set instance attributes, according to :py:attr:`kw`.
+        """Set instance attributes, according to :attr:`kw`.
 
-        :raises: :py:exc:`~postgres.orm.UnknownAttributes`
+        :raises: :exc:`~postgres.orm.UnknownAttributes`
 
         Call this when you update state in the database and you want to keep
         instance attributes in sync. Note that the only attributes we can set
-        here are the ones that were given to us by the :py:mod:`psycopg2`
+        here are the ones that were given to us by the :mod:`psycopg2`
         composite caster machinery when we were first instantiated. These will
         be the fields of the composite type for which we were registered, which
         will be column names for table and view types.

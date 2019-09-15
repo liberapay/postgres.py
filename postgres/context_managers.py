@@ -2,23 +2,23 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 
 class CursorContextManager(object):
-    """Instantiated once per :py:func:`~postgres.Postgres.get_cursor`
+    """Instantiated once per :func:`~postgres.Postgres.get_cursor`
     call.
 
-    :param pool: a :py:class:`psycopg2.pool.*ConnectionPool`
+    :param pool: a :class:`psycopg2.pool.*ConnectionPool`
 
-    The return value of :py:func:`CursorContextManager.__enter__` is a
-    :py:mod:`psycopg2` cursor. Any positional and keyword arguments to our
+    The return value of :func:`CursorContextManager.__enter__` is a
+    :mod:`psycopg2` cursor. Any positional and keyword arguments to our
     constructor are passed through to the cursor constructor.
 
     When the block starts, a connection is checked out of the connection pool
-    and :py:attr:`autocommit` is set to :py:const:`False`. Then a cursor is
-    constructed, and the :py:meth:`one` and :py:meth:`all` methods are scabbed
+    and :attr:`autocommit` is set to :const:`False`. Then a cursor is
+    constructed, and the :meth:`one` and :meth:`all` methods are scabbed
     on (this allows us to provide our simple API no matter the
-    :py:attr:`cursor_factory`). The cursor is returned to the :py:attr:`with`
+    :attr:`cursor_factory`). The cursor is returned to the :attr:`with`
     statement. If the block raises an exception, the connection is rolled back.
     Otherwise, it's committed. In either case, the cursor is closed,
-    :py:attr:`autocommit` is reset to :py:class:`False` (just in case) and the
+    :attr:`autocommit` is reset to :class:`False` (just in case) and the
     connection is put back in the pool.
 
     """
@@ -50,15 +50,15 @@ class CursorContextManager(object):
 
 
 class ConnectionContextManager(object):
-    """Instantiated once per :py:func:`~postgres.Postgres.get_connection` call.
+    """Instantiated once per :func:`~postgres.Postgres.get_connection` call.
 
-    :param pool: a :py:class:`psycopg2.pool.*ConnectionPool`
+    :param pool: a :class:`psycopg2.pool.*ConnectionPool`
 
-    The return value of :py:func:`ConnectionContextManager.__enter__` is a
-    :py:class:`postgres.Connection`. When the block starts, a
-    :py:class:`~postgres.Connection` is checked out of the connection pool and
-    :py:attr:`autocommit` is set to :py:const:`False`. When the block ends, the
-    :py:class:`~postgres.Connection` is rolled back before being put back in
+    The return value of :func:`ConnectionContextManager.__enter__` is a
+    :class:`postgres.Connection`. When the block starts, a
+    :class:`~postgres.Connection` is checked out of the connection pool and
+    :attr:`autocommit` is set to :const:`False`. When the block ends, the
+    :class:`~postgres.Connection` is rolled back before being put back in
     the pool.
 
     """
