@@ -290,6 +290,11 @@ class Postgres(object):
     registration of typecasters with :mod:`psycopg2` to ensure that you get
     unicode instead of bytestrings for text data, according to `this advice`_.)
 
+    The `libpq environment variables
+    <https://www.postgresql.org/docs/current/libpq-envars.html>`_ are used to
+    determine the connection paramaters which are not explicitly passed in the
+    :attr:`url` argument.
+
     When instantiated, this object creates a `thread-safe connection pool
     <http://initd.org/psycopg/docs/pool.html#psycopg2.pool.ThreadedConnectionPool>`_,
     which opens :attr:`minconn` connections immediately, and up to
@@ -321,7 +326,7 @@ class Postgres(object):
 
     """
 
-    def __init__(self, url, minconn=1, maxconn=10, \
+    def __init__(self, url='', minconn=1, maxconn=10, \
                                         cursor_factory=SimpleNamedTupleCursor):
         if url.startswith("postgres://"):
             dsn = url_to_dsn(url)
