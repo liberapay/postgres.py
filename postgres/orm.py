@@ -257,7 +257,7 @@ class Model(object):
 if __name__ == '__main__':
 
     from postgres import Postgres
-    db = Postgres("postgres://jrandom@localhost/test")
+    db = Postgres()
     db.run("DROP SCHEMA IF EXISTS public CASCADE")
     db.run("CREATE SCHEMA public")
     db.run("DROP TABLE IF EXISTS foo CASCADE")

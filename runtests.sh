@@ -5,8 +5,10 @@
 # fix them because fixing them would make the docs uglier. As long as the
 # doctests pass for Python 3 then we know the doc examples are good.
 
+if [ "$PGDATABASE" = "" ]; then export PGDATABASE="test"; fi
+
 function run_pytests() {
-    DATABASE_URL=postgres://jrandom@localhost/test py.test tests.py -v && return 0 || return 1
+    py.test tests.py -v && return 0 || return 1
 }
 
 function run_doctests() {
