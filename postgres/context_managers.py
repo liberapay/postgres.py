@@ -2,81 +2,88 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 
 class CursorContextManager(object):
-    """Instantiated once per :func:`~postgres.Postgres.get_cursor`
-    call.
+    """Instantiated once per :func:`~postgres.Postgres.get_cursor` call.
 
-    :param pool: a :class:`psycopg2.pool.*ConnectionPool`
+    :param pool: see :mod:`psycopg2.pool`
+    :param bool autocommit: see :attr:`psycopg2:connection.autocommit`
+    :param bool readonly: see :attr:`psycopg2:connection.readonly`
+    :param \**cursor_kwargs: passed to :meth:`psycopg2:connection.cursor`
 
-    The return value of :func:`CursorContextManager.__enter__` is a
-    :mod:`psycopg2` cursor. Any positional and keyword arguments to our
-    constructor are passed through to the cursor constructor.
+    During construction, a connection is checked out of the connection pool
+    and its :attr:`autocommit` and :attr:`readonly` attributes are set, then a
+    :class:`psycopg2:cursor` is created from that connection.
 
-    When the block starts, a connection is checked out of the connection pool
-    and :attr:`autocommit` is set to :const:`False`. Then a cursor is
-    constructed, and the :meth:`one` and :meth:`all` methods are scabbed
-    on (this allows us to provide our simple API no matter the
-    :attr:`cursor_factory`). The cursor is returned to the :attr:`with`
-    statement. If the block raises an exception, the connection is rolled back.
-    Otherwise, it's committed. In either case, the cursor is closed,
-    :attr:`autocommit` is reset to :class:`False` (just in case) and the
-    connection is put back in the pool.
+    Upon exit of the ``with`` block, the connection is rolled back if an
+    exception was raised, or committed otherwise. There are two exceptions to
+    this:
+
+    1. if :attr:`autocommit` is :obj:`True`, then the connection is neither
+       rolled back nor committed;
+    2. if :attr:`readonly` is :obj:`True`, then the connection is always rolled
+       back, never committed.
+
+    In all cases the cursor is closed and the connection is put back in the pool.
 
     """
 
-    def __init__(self, pool, *a, **kw):
+    __slots__ = ('pool', 'conn', 'cursor')
+
+    def __init__(self, pool, autocommit=False, readonly=False, **cursor_kwargs):
         self.pool = pool
-        self.a = a
-        self.kw = kw
-        self.conn = None
+        conn = self.pool.getconn()
+        conn.autocommit = autocommit
+        conn.readonly = readonly
+        self.cursor = conn.cursor(**cursor_kwargs)
+        self.conn = conn
 
     def __enter__(self):
-        """Get a connection from the pool.
-        """
-        self.conn = self.pool.getconn()
-        self.conn.autocommit = False
-        self.cursor = self.conn.cursor(*self.a, **self.kw)
         return self.cursor
 
-    def __exit__(self, *exc_info):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         """Put our connection back in the pool.
         """
-        if exc_info == (None, None, None):
-            self.conn.commit()
+        conn = self.conn
+        if conn.autocommit:
+            pass
+        elif exc_type is None and conn.readonly is False:
+            conn.commit()
         else:
-            self.conn.rollback()
+            conn.rollback()
         self.cursor.close()
-        self.conn.autocommit = False
-        self.pool.putconn(self.conn)
+        self.pool.putconn(conn)
 
 
 class ConnectionContextManager(object):
     """Instantiated once per :func:`~postgres.Postgres.get_connection` call.
 
-    :param pool: a :class:`psycopg2.pool.*ConnectionPool`
+    :param pool: see :mod:`psycopg2.pool`
+    :param bool autocommit: see :attr:`psycopg2:connection.autocommit`
+    :param bool readonly: see :attr:`psycopg2:connection.readonly`
 
-    The return value of :func:`ConnectionContextManager.__enter__` is a
-    :class:`postgres.Connection`. When the block starts, a
-    :class:`~postgres.Connection` is checked out of the connection pool and
-    :attr:`autocommit` is set to :const:`False`. When the block ends, the
-    :class:`~postgres.Connection` is rolled back before being put back in
+    This context manager checks out a connection out of the specified pool, sets
+    its :attr:`autocommit` and :attr:`readonly` attributes.
+
+    The :meth:`__enter__` method returns the :class:`~postgres.Connection`.
+
+    The :meth:`__exit__` method rolls back the connection and puts it back in
     the pool.
 
     """
 
-    def __init__(self, pool):
+    __slots__ = ('pool', 'conn')
+
+    def __init__(self, pool, autocommit=False, readonly=False):
         self.pool = pool
-        self.conn = None
+        conn = self.pool.getconn()
+        conn.autocommit = autocommit
+        conn.readonly = readonly
+        self.conn = conn
 
     def __enter__(self):
-        """Get a connection from the pool.
-        """
-        self.conn = self.pool.getconn()
-        self.conn.autocommit = False
         return self.conn
 
     def __exit__(self, *exc_info):
         """Put our connection back in the pool.
         """
         self.conn.rollback()
-        self.conn.autocommit = False
         self.pool.putconn(self.conn)

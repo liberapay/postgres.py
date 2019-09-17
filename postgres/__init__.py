@@ -276,6 +276,8 @@ class Postgres(object):
         <http://www.postgresql.org/docs/current/static/libpq-connect.html>`_
     :param int minconn: The minimum size of the connection pool
     :param int maxconn: The maximum size of the connection pool
+    :param bool readonly: Setting this to :obj:`True` makes all connections and
+        cursors readonly by default.
     :param cursor_factory: Defaults to
         :class:`~postgres.cursors.SimpleNamedTupleCursor`
 
@@ -326,13 +328,14 @@ class Postgres(object):
 
     """
 
-    def __init__(self, url='', minconn=1, maxconn=10, \
-                                        cursor_factory=SimpleNamedTupleCursor):
+    def __init__(self, url='', minconn=1, maxconn=10, readonly=False,
+                 cursor_factory=SimpleNamedTupleCursor):
         if url.startswith("postgres://"):
             dsn = url_to_dsn(url)
         else:
             dsn = url
 
+        self.readonly = readonly
 
         # Set up connection pool.
         # =======================
@@ -574,25 +577,27 @@ class Postgres(object):
         ...
         [Record(bar='buz', baz=42), Record(bar='bit', baz=537)]
 
-        The cursor will have :attr:`autocommit` turned off on its
+        By default the cursor will have :attr:`autocommit` turned off on its
         connection. If your code block inside the :obj:`with` statement
         raises an exception, the transaction will be rolled back. Otherwise,
         it'll be committed. The context manager closes the cursor when the
-        block ends, resets :attr:`autocommit` to off on the connection, and
-        puts the connection back in the pool. The cursor is destroyed after
-        use.
+        block ends and puts the connection back in the pool. The cursor is
+        destroyed after use.
 
         Use this when you want a series of statements to be part of one
         transaction, but you don't need fine-grained control over the
         transaction.
 
         """
+        kw.setdefault('readonly', self.readonly)
         return CursorContextManager(self.pool, **kw)
 
 
-    def get_connection(self):
+    def get_connection(self, **kw):
         """Return a :class:`~postgres.ConnectionContextManager` that uses
         our connection pool.
+
+        :param kw: passed through to :class:`.ConnectionContextManager`
 
         >>> with db.get_connection() as connection:
         ...     cursor = connection.cursor()
@@ -617,7 +622,8 @@ class Postgres(object):
         [Record(bar='buz', baz=42), Record(bar='bit', baz=537)]
 
         """
-        return ConnectionContextManager(self.pool)
+        kw.setdefault('readonly', self.readonly)
+        return ConnectionContextManager(self.pool, **kw)
 
 
     def register_model(self, ModelSubclass, typname=None):
