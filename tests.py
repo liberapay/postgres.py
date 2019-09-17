@@ -11,6 +11,10 @@ from psycopg2.errors import InterfaceError, ProgrammingError, ReadOnlySqlTransac
 from pytest import mark, raises
 
 
+class Heck(Exception):
+    pass
+
+
 # harnesses
 # =========
 
@@ -183,7 +187,6 @@ class TestCursor(WithData):
         assert actual == ["baz", "blam", "buz"]
 
     def test_transaction_rolls_back_on_failure(self):
-        class Heck(Exception): pass
         try:
             with self.db.get_cursor() as cursor:
                 cursor.execute("INSERT INTO foo VALUES ('blam')")
@@ -193,6 +196,14 @@ class TestCursor(WithData):
             pass
         actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == ["baz", "buz"]
+
+    def test_cursor_rollback_exception_is_ignored(self):
+        try:
+            with self.db.get_cursor() as cursor:
+                cursor.connection.close()
+                raise Heck
+        except Heck:
+            pass
 
     def test_we_close_the_cursor(self):
         with self.db.get_cursor() as cursor:
@@ -249,6 +260,14 @@ class TestConnection(WithData):
             cursor.execute("SELECT * FROM foo ORDER BY bar")
             actual = cursor.fetchall()
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
+
+    def test_connection_rollback_exception_is_ignored(self):
+        try:
+            with self.db.get_connection() as conn:
+                conn.close()
+                raise Heck
+        except Heck:
+            pass
 
 
 # orm
