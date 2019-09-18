@@ -796,17 +796,15 @@ def make_Connection(postgres):
             psycopg2.extensions.connection.__init__(self, *a, **kw)
             self.set_client_encoding('UTF-8')
             self.postgres = postgres
+            self.cursor_factory = self.postgres.default_cursor_factory
 
         def cursor(self, back_as=None, **kw):
-            if 'cursor_factory' not in kw:
+            if back_as is not None and 'cursor_factory' not in kw:
                 # Compute cursor_factory from back_as.
-                if back_as is None:
-                    kw['cursor_factory'] = self.postgres.default_cursor_factory
-                else:
-                    try:
-                        kw['cursor_factory'] = self.back_as_registry[back_as]
-                    except KeyError:
-                        raise BadBackAs(back_as)
+                try:
+                    kw['cursor_factory'] = self.back_as_registry[back_as]
+                except KeyError:
+                    raise BadBackAs(back_as)
             return psycopg2.extensions.connection.cursor(self, **kw)
 
     return Connection
