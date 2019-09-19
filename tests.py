@@ -21,7 +21,7 @@ class Heck(Exception):
 class WithSchema(TestCase):
 
     def setUp(self):
-        self.db = Postgres(cursor_factory=SimpleDictCursor)
+        self.db = Postgres()
         self.db.run("DROP SCHEMA IF EXISTS public CASCADE")
         self.db.run("CREATE SCHEMA public")
 
@@ -62,17 +62,21 @@ class TestRun(WithSchema):
 
 class TestRows(WithData):
 
-    def test_rows_fetches_all_rows(self):
+    def test_all_fetches_all_rows(self):
         actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == ["baz", "buz"]
 
-    def test_rows_fetches_one_row(self):
+    def test_all_fetches_one_row(self):
         actual = self.db.all("SELECT * FROM foo WHERE bar='baz'")
         assert actual == ["baz"]
 
-    def test_rows_fetches_no_rows(self):
+    def test_all_fetches_no_rows(self):
         actual = self.db.all("SELECT * FROM foo WHERE bar='blam'")
         assert actual == []
+
+    def test_all_doesnt_choke_on_values_column(self):
+        actual = self.db.all("SELECT bar AS values FROM foo")
+        assert actual == ["baz", "buz"]
 
     def test_bind_parameters_as_dict_work(self):
         params = {"bar": "baz"}
@@ -183,6 +187,10 @@ class TestOneOrZero(WithData):
         actual = self.db.one("SELECT * FROM foo WHERE bar='baz'")
         assert actual == "baz"
 
+    def test_one_doesnt_choke_on_values_column(self):
+        actual = self.db.one("SELECT 1 AS values")
+        assert actual == 1
+
     def test_with_strict_True_one_raises_TooMany(self):
         self.assertRaises(TooMany, self.db.one, "SELECT * FROM foo")
 
@@ -193,7 +201,7 @@ class TestOneOrZero(WithData):
 class TestCursor(WithData):
 
     def test_get_cursor_gets_a_cursor(self):
-        with self.db.get_cursor() as cursor:
+        with self.db.get_cursor(cursor_factory=SimpleDictCursor) as cursor:
             cursor.execute("INSERT INTO foo VALUES ('blam')")
             cursor.execute("SELECT * FROM foo ORDER BY bar")
             actual = cursor.fetchall()
@@ -283,7 +291,7 @@ class TestConnection(WithData):
 
     def test_get_connection_gets_a_connection(self):
         with self.db.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=SimpleDictCursor)
             cursor.execute("SELECT * FROM foo ORDER BY bar")
             actual = cursor.fetchall()
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]
