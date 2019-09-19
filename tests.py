@@ -21,7 +21,7 @@ class Heck(Exception):
 class WithSchema(TestCase):
 
     def setUp(self):
-        self.db = Postgres(cursor_factory=SimpleDictCursor)
+        self.db = Postgres()
         self.db.run("DROP SCHEMA IF EXISTS public CASCADE")
         self.db.run("CREATE SCHEMA public")
 
@@ -62,17 +62,21 @@ class TestRun(WithSchema):
 
 class TestRows(WithData):
 
-    def test_rows_fetches_all_rows(self):
+    def test_all_fetches_all_rows(self):
         actual = self.db.all("SELECT * FROM foo ORDER BY bar")
         assert actual == ["baz", "buz"]
 
-    def test_rows_fetches_one_row(self):
+    def test_all_fetches_one_row(self):
         actual = self.db.all("SELECT * FROM foo WHERE bar='baz'")
         assert actual == ["baz"]
 
-    def test_rows_fetches_no_rows(self):
+    def test_all_fetches_no_rows(self):
         actual = self.db.all("SELECT * FROM foo WHERE bar='blam'")
         assert actual == []
+
+    def test_all_doesnt_choke_on_values_column(self):
+        actual = self.db.all("SELECT bar AS values FROM foo")
+        assert actual == ["baz", "buz"]
 
     def test_bind_parameters_as_dict_work(self):
         params = {"bar": "baz"}
@@ -97,29 +101,11 @@ class TestWrongNumberException(WithData):
         assert actual == "Got -1 rows; expecting 0 or 1."
 
     def test_TooMany_message_is_helpful_for_two_options(self):
-        try:
-            with self.db.get_cursor() as cursor:
-                actual = cursor._some( "SELECT * FROM foo"
-                                     , parameters=None
-                                     , lo=1
-                                     , hi=1
-                                      )
-        except TooMany as exc:
-            actual = str(exc)
+        actual = str(TooMany(2, 1, 1))
         assert actual == "Got 2 rows; expecting exactly 1."
 
     def test_TooMany_message_is_helpful_for_a_range(self):
-        self.db.run("INSERT INTO foo VALUES ('blam')")
-        self.db.run("INSERT INTO foo VALUES ('blim')")
-        try:
-            with self.db.get_cursor() as cursor:
-                actual = cursor._some( "SELECT * FROM foo"
-                                     , parameters=None
-                                     , lo=1
-                                     , hi=3
-                                      )
-        except TooMany as exc:
-            actual = str(exc)
+        actual = str(TooMany(4, 1, 3))
         assert actual == "Got 4 rows; expecting between 1 and 3 (inclusive)."
 
 
@@ -145,16 +131,47 @@ class TestOneOrZero(WithData):
         actual = self.db.one("SELECT * FROM foo WHERE bar='blam'")
         assert actual is None
 
-    def test_one_returns_whatever(self):
+    def test_one_returns_default(self):
         class WHEEEE: pass
         actual = self.db.one( "SELECT * FROM foo WHERE bar='blam'"
                             , default=WHEEEE
                              )
         assert actual is WHEEEE
 
+    def test_one_raises_default(self):
+        exception = RuntimeError('oops')
+        try:
+            actual = self.db.one( "SELECT * FROM foo WHERE bar='blam'"
+                                , default=exception
+                                 )
+        except Exception as e:
+            if e is not exception:
+                raise
+        else:
+            raise AssertionError('exception not raised')
+
+    def test_one_returns_default_after_derefencing(self):
+        default = 0
+        actual = self.db.one("SELECT NULL AS foo", default=default)
+        assert actual is default
+
+    def test_one_raises_default_after_derefencing(self):
+        exception = RuntimeError('oops')
+        try:
+            self.db.one("SELECT NULL AS foo", default=exception)
+        except Exception as e:
+            if e is not exception:
+                raise
+        else:
+            raise AssertionError('exception not raised')
+
     def test_one_returns_one(self):
         actual = self.db.one("SELECT * FROM foo WHERE bar='baz'")
         assert actual == "baz"
+
+    def test_one_doesnt_choke_on_values_column(self):
+        actual = self.db.one("SELECT 1 AS values")
+        assert actual == 1
 
     def test_with_strict_True_one_raises_TooMany(self):
         self.assertRaises(TooMany, self.db.one, "SELECT * FROM foo")
@@ -166,7 +183,7 @@ class TestOneOrZero(WithData):
 class TestCursor(WithData):
 
     def test_get_cursor_gets_a_cursor(self):
-        with self.db.get_cursor() as cursor:
+        with self.db.get_cursor(cursor_factory=SimpleDictCursor) as cursor:
             cursor.execute("INSERT INTO foo VALUES ('blam')")
             cursor.execute("SELECT * FROM foo ORDER BY bar")
             actual = cursor.fetchall()
@@ -256,7 +273,7 @@ class TestConnection(WithData):
 
     def test_get_connection_gets_a_connection(self):
         with self.db.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=SimpleDictCursor)
             cursor.execute("SELECT * FROM foo ORDER BY bar")
             actual = cursor.fetchall()
         assert actual == [{"bar": "baz"}, {"bar": "buz"}]

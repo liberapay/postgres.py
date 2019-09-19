@@ -98,36 +98,31 @@ class SimpleCursorBase(object):
         """
 
         # fetch
-        out = self._some(sql, parameters, lo=0, hi=1)
-        if out:
-            assert len(out) == 1
-            out = out[0]
-        else:
-            out = None
-
-        # dereference
-        if out is not None and len(out) == 1:
-            seq = list(out.values()) if hasattr(out, 'values') else out
-            out = seq[0]
-
-        # default
-        if out is None:
+        self.execute(sql, parameters)
+        if self.rowcount == 1:
+            out = self.fetchone()
+        elif self.rowcount == 0:
             if isexception(default):
                 raise default
-            out = default
+            return default
+        elif self.rowcount < 0:
+            raise TooFew(self.rowcount, 0, 1)
+        else:
+            raise TooMany(self.rowcount, 0, 1)
+
+        # dereference
+        if len(out) == 1:
+            try:
+                out = out[0]
+            except LookupError:
+                if callable(getattr(out, 'values', None)):
+                    out = tuple(out.values())[0]
+            if out is None:
+                if isexception(default):
+                    raise default
+                return default
 
         return out
-
-
-    def _some(self, sql, parameters, lo, hi):
-        self.execute(sql, parameters)
-
-        if self.rowcount < lo:
-            raise TooFew(self.rowcount, lo, hi)
-        elif self.rowcount > hi:
-            raise TooMany(self.rowcount, lo, hi)
-
-        return self.fetchall()
 
 
     def all(self, sql, parameters=None):
@@ -140,11 +135,13 @@ class SimpleCursorBase(object):
         """
         self.execute(sql, parameters)
         recs = self.fetchall()
-        if recs and len(recs[0]) == 1:          # dereference
-            if hasattr(recs[0], 'values'):      # mapping
-                recs = [list(rec.values())[0] for rec in recs]
-            else:                               # sequence
+        if recs and len(recs[0]) == 1:
+            # dereference
+            try:
                 recs = [rec[0] for rec in recs]
+            except LookupError:
+                if callable(getattr(recs[0], 'values', None)):
+                    recs = [tuple(rec.values())[0] for rec in recs]
         return recs
 
 
