@@ -268,6 +268,16 @@ class BadBackAs(Exception):
 # The Main Event
 # ==============
 
+default_back_as_registry = {
+    tuple: SimpleTupleCursor,
+    'tuple': SimpleTupleCursor,
+    namedtuple: SimpleNamedTupleCursor,
+    'namedtuple': SimpleNamedTupleCursor,
+    dict: SimpleDictCursor,
+    'dict': SimpleDictCursor
+}
+
+
 class Postgres(object):
     """Interact with a `PostgreSQL <http://www.postgresql.org/>`_ database.
 
@@ -280,6 +290,8 @@ class Postgres(object):
         cursors readonly by default.
     :param cursor_factory: Defaults to
         :class:`~postgres.cursors.SimpleNamedTupleCursor`
+    :param dict back_as_registry: Defines the values that can be passed in the
+        :obj:`back_as` argument of :meth:`one()` and :meth:`all`.
 
     This is the main object that :mod:`postgres` provides, and you should
     have one instance per process for each PostgreSQL database your process
@@ -329,7 +341,8 @@ class Postgres(object):
     """
 
     def __init__(self, url='', minconn=1, maxconn=10, readonly=False,
-                 cursor_factory=SimpleNamedTupleCursor):
+                 cursor_factory=SimpleNamedTupleCursor,
+                 back_as_registry=default_back_as_registry):
         if url.startswith("postgres://"):
             dsn = url_to_dsn(url)
         else:
@@ -342,6 +355,7 @@ class Postgres(object):
 
         if not issubclass(cursor_factory, SimpleCursorBase):
             raise NotASimpleCursor(cursor_factory)
+        self.back_as_registry = back_as_registry
         self.default_cursor_factory = cursor_factory
         Connection = make_Connection(self)
         self.pool = ConnectionPool( minconn=minconn
@@ -746,8 +760,7 @@ class Postgres(object):
 # ===============
 
 def make_Connection(postgres):
-    """Define and return a subclass of
-    :class:`psycopg2.extensions.connection`.
+    """Define and return a subclass of :class:`psycopg2.extensions.connection`.
 
     :param postgres: the :class:`~postgres.Postgres` instance to bind to
     :returns: a :class:`Connection` class
@@ -777,43 +790,22 @@ def make_Connection(postgres):
     """
     class Connection(psycopg2.extensions.connection):
 
+        back_as_registry = postgres.back_as_registry
+
         def __init__(self, *a, **kw):
             psycopg2.extensions.connection.__init__(self, *a, **kw)
             self.set_client_encoding('UTF-8')
             self.postgres = postgres
+            self.cursor_factory = self.postgres.default_cursor_factory
 
-        def cursor(self, *a, **kw):
-            if 'back_as' in kw:
-                back_as = kw.pop('back_as')
-                kw = self.handle_back_as(back_as, **kw)
-            if 'cursor_factory' not in kw:
-                kw['cursor_factory'] = self.postgres.default_cursor_factory
-            return psycopg2.extensions.connection.cursor(self, *a, **kw)
-
-        def handle_back_as(self, back_as, **kw):
-
-            if 'cursor_factory' not in kw:
-
+        def cursor(self, back_as=None, **kw):
+            if back_as is not None and 'cursor_factory' not in kw:
                 # Compute cursor_factory from back_as.
-                # ====================================
-
-                registry = { tuple: SimpleTupleCursor
-                           , 'tuple': SimpleTupleCursor
-                           , namedtuple: SimpleNamedTupleCursor
-                           , 'namedtuple': SimpleNamedTupleCursor
-                           , dict: SimpleDictCursor
-                           , 'dict': SimpleDictCursor
-                           , None: None
-                             }
-
-                if back_as not in registry:
+                try:
+                    kw['cursor_factory'] = self.back_as_registry[back_as]
+                except KeyError:
                     raise BadBackAs(back_as)
-
-                cursor_factory = registry[back_as]
-                if cursor_factory is not None:
-                    kw['cursor_factory'] = cursor_factory
-
-            return kw
+            return psycopg2.extensions.connection.cursor(self, **kw)
 
     return Connection
 
