@@ -44,18 +44,9 @@ class CursorContextManager(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Put our connection back in the pool.
         """
-        conn = self.conn
-        if conn.autocommit:
-            pass
-        elif exc_type is None and conn.readonly is False:
-            conn.commit()
-        else:
-            try:
-                conn.rollback()
-            except InterfaceError:
-                pass
         self.cursor.close()
-        self.pool.putconn(conn)
+        self.conn.__exit__(exc_type, exc_val, exc_tb)
+        self.pool.putconn(self.conn)
 
 
 class ConnectionContextManager(object):

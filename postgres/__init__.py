@@ -184,7 +184,7 @@ from postgres.context_managers import CursorContextManager
 from postgres.cursors import SimpleTupleCursor, SimpleNamedTupleCursor
 from postgres.cursors import SimpleDictCursor, SimpleCursorBase
 from postgres.orm import Model
-from psycopg2 import DataError
+from psycopg2 import DataError, InterfaceError
 from psycopg2.extras import register_composite, CompositeCaster
 from psycopg2.pool import ThreadedConnectionPool as ConnectionPool
 
@@ -798,6 +798,21 @@ def make_Connection(postgres):
             self.postgres = postgres
             self.cursor_factory = self.postgres.default_cursor_factory
 
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            """Commit the changes, or roll them back if there's an exception.
+
+            This method doesn't close the connection.
+            """
+            if self.autocommit:
+                pass
+            elif exc_type is None and self.readonly is False:
+                self.commit()
+            else:
+                try:
+                    self.rollback()
+                except InterfaceError:
+                    pass
+
         def cursor(self, back_as=None, **kw):
             if back_as is not None and 'cursor_factory' not in kw:
                 # Compute cursor_factory from back_as.
@@ -806,6 +821,8 @@ def make_Connection(postgres):
                 except KeyError:
                     raise BadBackAs(back_as)
             return psycopg2.extensions.connection.cursor(self, **kw)
+
+        get_cursor = cursor
 
     return Connection
 
