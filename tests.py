@@ -4,7 +4,7 @@ import os
 from collections import namedtuple
 from unittest import TestCase
 
-from postgres import Postgres, NotAModel, NotRegistered
+from postgres import Postgres, NotAModel, NotRegistered, NoSuchType, NoTypeSpecified
 from postgres.cursors import TooFew, TooMany, SimpleDictCursor
 from postgres.orm import ReadOnly, Model
 from psycopg2.errors import InterfaceError, ProgrammingError, ReadOnlySqlTransaction
@@ -325,6 +325,20 @@ class TestORM(WithData):
     def installFlah(self):
         self.db.run("CREATE TABLE flah (bar text)")
         self.db.register_model(self.MyModel, 'flah')
+
+    def test_register_model_handles_schema(self):
+        self.db.run("DROP SCHEMA IF EXISTS foo CASCADE")
+        self.db.run("CREATE SCHEMA foo")
+        self.db.run("CREATE TABLE foo.flah (bar text)")
+        self.db.register_model(self.MyModel, 'foo.flah')
+
+    def test_register_model_raises_NoSuchType(self):
+        with self.assertRaises(NoSuchType):
+            self.db.register_model(self.MyModel, 'nonexistent')
+
+    def test_register_model_raises_NoTypeSpecified(self):
+        with self.assertRaises(NoTypeSpecified):
+            self.db.register_model(Model)
 
     def test_orm_basically_works(self):
         one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
