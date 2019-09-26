@@ -8,9 +8,13 @@ and :meth:`all`.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from inspect import isclass
+from operator import itemgetter
 
 from psycopg2.extensions import cursor as TupleCursor
 from psycopg2.extras import NamedTupleCursor, RealDictCursor
+
+
+itemgetter0 = itemgetter(0)
 
 
 # Exceptions
@@ -138,23 +142,158 @@ class SimpleCursorBase(object):
         if recs and len(recs[0]) == 1:
             # dereference
             try:
-                recs = [rec[0] for rec in recs]
+                recs = list(map(itemgetter0, recs))
             except LookupError:
                 if callable(getattr(recs[0], 'values', None)):
                     recs = [tuple(rec.values())[0] for rec in recs]
         return recs
 
 
+class Row(object):
+    """A versatile row type.
+    """
+
+    __slots__ = ('_cols', '__dict__')
+
+    def __init__(self, cols, values):
+        self._cols = cols
+        self.__dict__.update(zip(map(itemgetter0, cols), values))
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self.__dict__[self._cols[key][0]]
+        elif isinstance(key, slice):
+            return [self.__dict__[col[0]] for col in self._cols[key]]
+        else:
+            return self.__dict__[key]
+
+    def __setitem__(self, key, value):
+        if isinstance(key, (int, slice)):
+            raise TypeError('index-based assignments are not allowed')
+        self.__dict__[key] = value
+
+    def __contains__(self, key):
+        return key in self.__dict__
+
+    def __eq__(self, other):
+        if isinstance(other, Row):
+            return other.__dict__ == self.__dict__
+        elif isinstance(other, dict):
+            return other == self.__dict__
+        elif isinstance(other, tuple):
+            return len(self.__dict__) == len(self._cols) and other == tuple(self)
+        return False
+
+    def __len__(self):
+        return len(self.__dict__)
+
+    def __repr__(self):
+        col_indexes = {col[0]: i for i, col in enumerate(self._cols)}
+        after = len(self._cols)
+        key = lambda t: (col_indexes.get(t[0], after), t[0])
+        return 'Row(%s)' % (
+            ', '.join(map('%s=%r'.__mod__, sorted(self.__dict__.items(), key=key)))
+        )
+
+    def __getstate__(self):
+        # We only save the column names, not the other column attributes.
+        return tuple(map(itemgetter0, self._cols)), self.__dict__.copy()
+
+    def __setstate__(self, data):
+        self._cols = tuple((col_name,) for col_name in data[0])
+        self.__dict__.update(data[1])
+
+    def _asdict(self):
+        """For compatibility with namedtuple classes."""
+        return self.__dict__.copy()
+
+    @property
+    def _fields(self):
+        """For compatibility with namedtuple classes."""
+        return tuple(map(itemgetter0, self._cols))
+
+
+class RowCursor(TupleCursor):
+    """A cursor subclass that generates :class:`Row` objects.
+    """
+
+    def fetchone(self):
+        """"""
+        t = TupleCursor.fetchone(self)
+        if t is not None:
+            return Row(self.description, t)
+
+    def fetchmany(self, size=None):
+        """"""
+        ts = TupleCursor.fetchmany(self, size)
+        cols = self.description
+        return [Row(cols, t) for t in ts]
+
+    def fetchall(self):
+        """"""
+        ts = TupleCursor.fetchall(self)
+        cols = self.description
+        return [Row(cols, t) for t in ts]
+
+    def __iter__(self):
+        """"""
+        it = TupleCursor.__iter__(self)
+        while True:
+            try:
+                t = next(it)
+            except StopIteration:
+                return
+            yield Row(self.description, t)
+
+
 class SimpleTupleCursor(SimpleCursorBase, TupleCursor):
     """A `simple cursor`_ that returns tuples.
+
+    This type of cursor is especially well suited if you need to fetch and process
+    a large number of rows at once, because tuples occupy less memory than dicts.
     """
 
 class SimpleNamedTupleCursor(SimpleCursorBase, NamedTupleCursor):
     """A `simple cursor`_ that returns namedtuples.
+
+    This type of cursor is especially well suited if you need to fetch and process
+    a large number of similarly-structured rows at once, and you also need the row
+    objects to be more evolved than simple tuples.
     """
 
 class SimpleDictCursor(SimpleCursorBase, RealDictCursor):
     """A `simple cursor`_ that returns dicts.
+
+    This type of cursor is especially well suited if you don't care about the
+    order of the columns and don't need to access them as attributes.
+    """
+
+class SimpleRowCursor(SimpleCursorBase, RowCursor):
+    """A `simple cursor`_ that returns :class:`Row` objects.
+
+    This type of cursor is especially well suited if you want rows to be mutable.
+
+    The Row class implements both dict-style and attribute-style lookups and
+    assignments, in addition to index-based lookups. However, index-based
+    assigments aren't allowed.
+
+        >>> from postgres import Postgres
+        >>> from postgres.cursors import SimpleRowCursor
+        >>> db = Postgres(cursor_factory=SimpleRowCursor)
+        >>> row = db.one("SELECT 1 as key, 'foo' as value")
+        >>> row[0] == row['key'] == row.key == 1
+        True
+        >>> key, value = row
+        >>> (key, value)
+        (1, 'foo')
+        >>> row.value = 'bar'
+        >>> row.timestamp = '2019-09-20 13:15:22.060537+00'
+        >>> row
+        Row(key=1, value='bar', timestamp='2019-09-20 13:15:22.060537+00')
+
+    Although Row objects support item lookups and assigments, they are not
+    instances of the :class:`dict` class and they don't have its methods
+    (:meth:`~dict.get`, :meth:`~dict.items`, etc.).
     """
 
 
