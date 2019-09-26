@@ -286,6 +286,15 @@ class TestConnection(WithData):
         except Heck:
             pass
 
+    def test_connection_has_get_cursor_method(self):
+        with self.db.get_connection() as conn:
+            with conn.get_cursor() as cursor:
+                cursor.execute("DELETE FROM foo WHERE bar = 'baz'")
+            with conn.get_cursor(cursor_factory=SimpleDictCursor) as cursor:
+                cursor.execute("SELECT * FROM foo ORDER BY bar")
+                actual = cursor.fetchall()
+        assert actual == [{"bar": "buz"}]
+
 
 # orm
 # ===
