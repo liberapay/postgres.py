@@ -7,11 +7,11 @@ python:
 addons:
   postgresql: 9.6
 install:
-  - pip install pytest ./
+  - pip install tox-travis
 before_script:
   - psql -U postgres -c 'CREATE DATABASE "test";'
 script:
-  - ./runtests.sh
+  - tox
 branches:
   only:
     - master
