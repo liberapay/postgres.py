@@ -184,7 +184,7 @@ from postgres.context_managers import CursorContextManager
 from postgres.cursors import SimpleTupleCursor, SimpleNamedTupleCursor
 from postgres.cursors import SimpleDictCursor, SimpleCursorBase
 from postgres.orm import Model
-from psycopg2 import DataError, InterfaceError
+from psycopg2 import DataError, InterfaceError, ProgrammingError
 from psycopg2.extras import register_composite, CompositeCaster
 from psycopg2.pool import ThreadedConnectionPool as ConnectionPool
 
@@ -669,20 +669,9 @@ class Postgres(object):
             if typname is None:
                 raise NoTypeSpecified(ModelSubclass)
 
-        n = self.one( "SELECT count(*) FROM pg_type WHERE typname=%s"
-                    , (typname,)
-                     )
-        if n < 1:
-            # Could be more than one since we don't constrain by typnamespace.
-            # XXX What happens then?
-            raise NoSuchType(typname)
-
         if typname in self.model_registry:
             existing_model = self.model_registry[typname]
             raise AlreadyRegistered(existing_model, typname)
-
-        self.model_registry[typname] = ModelSubclass
-        ModelSubclass.db = self
 
         # register a composite
         with self.get_connection() as conn:
@@ -690,11 +679,15 @@ class Postgres(object):
             name = typname
             if sys.version_info[0] < 3:
                 name = name.encode('UTF-8')
-            register_composite( name
-                              , cursor
-                              , globally=True
-                              , factory=self.DelegatingCaster
-                               )
+            try:
+                register_composite(
+                    name, cursor, globally=True, factory=self.DelegatingCaster
+                )
+            except ProgrammingError:
+                raise NoSuchType(typname)
+
+        self.model_registry[typname] = ModelSubclass
+        ModelSubclass.db = self
 
 
     def unregister_model(self, ModelSubclass):
