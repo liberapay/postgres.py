@@ -181,8 +181,10 @@ import psycopg2
 from inspect import isclass
 from postgres.context_managers import ConnectionContextManager
 from postgres.context_managers import CursorContextManager
-from postgres.cursors import SimpleTupleCursor, SimpleNamedTupleCursor
-from postgres.cursors import SimpleDictCursor, SimpleCursorBase
+from postgres.cursors import (
+    Row, SimpleCursorBase, SimpleDictCursor, SimpleNamedTupleCursor,
+    SimpleRowCursor, SimpleTupleCursor,
+)
 from postgres.orm import Model
 from psycopg2 import DataError, InterfaceError, ProgrammingError
 from psycopg2.extras import register_composite, CompositeCaster
@@ -274,7 +276,9 @@ default_back_as_registry = {
     namedtuple: SimpleNamedTupleCursor,
     'namedtuple': SimpleNamedTupleCursor,
     dict: SimpleDictCursor,
-    'dict': SimpleDictCursor
+    'dict': SimpleDictCursor,
+    Row: SimpleRowCursor,
+    'Row': SimpleRowCursor,
 }
 
 

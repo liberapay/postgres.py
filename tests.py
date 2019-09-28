@@ -2,10 +2,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from collections import namedtuple
+import sys
 from unittest import TestCase
 
 from postgres import Postgres, NotAModel, NotRegistered, NoSuchType, NoTypeSpecified
-from postgres.cursors import TooFew, TooMany, SimpleDictCursor
+from postgres.cursors import (
+    TooFew, TooMany, Row, SimpleDictCursor, SimpleNamedTupleCursor, SimpleRowCursor,
+)
 from postgres.orm import ReadOnly, Model
 from psycopg2.errors import InterfaceError, ProgrammingError, ReadOnlySqlTransaction
 from pytest import mark, raises
@@ -445,22 +448,113 @@ class TestORM(WithData):
 # cursor_factory
 # ==============
 
-class TestCursorFactory(WithData):
+class WithCursorFactory(WithSchema):
 
     def setUp(self):                    # override
-        self.db = Postgres()
+        self.db = Postgres(cursor_factory=self.cursor_factory)
         self.db.run("DROP SCHEMA IF EXISTS public CASCADE")
         self.db.run("CREATE SCHEMA public")
-        self.db.run("CREATE TABLE foo (bar text, baz int)")
+        self.db.run("CREATE TABLE foo (key text, value int)")
         self.db.run("INSERT INTO foo VALUES ('buz', 42)")
         self.db.run("INSERT INTO foo VALUES ('biz', 43)")
 
+
+class TestNamedTupleCursorFactory(WithCursorFactory):
+
+    cursor_factory = SimpleNamedTupleCursor
+
     def test_NamedDictCursor_results_in_namedtuples(self):
-        Record = namedtuple("Record", ["bar", "baz"])
-        expected = [Record(bar="biz", baz=43), Record(bar="buz", baz=42)]
-        actual = self.db.all("SELECT * FROM foo ORDER BY bar")
+        Record = namedtuple("Record", ["key", "value"])
+        expected = [Record(key="biz", value=43), Record(key="buz", value=42)]
+        actual = self.db.all("SELECT * FROM foo ORDER BY key")
         assert actual == expected
+        assert actual[0].__class__.__name__ == 'Record'
 
     def test_namedtuples_can_be_unrolled(self):
-        actual = self.db.all("SELECT baz FROM foo ORDER BY bar")
+        actual = self.db.all("SELECT value FROM foo ORDER BY key")
         assert actual == [43, 42]
+
+
+class TestRowCursorFactory(WithCursorFactory):
+
+    cursor_factory = SimpleRowCursor
+
+    def test_RowCursor_returns_Row_objects(self):
+        row = self.db.one("SELECT * FROM foo ORDER BY key LIMIT 1")
+        assert isinstance(row, Row)
+        rows = self.db.all("SELECT * FROM foo ORDER BY key")
+        assert all(isinstance(r, Row) for r in rows)
+
+    def test_Row_objects_can_be_unrolled(self):
+        actual = self.db.all("SELECT value FROM foo ORDER BY key")
+        assert actual == [43, 42]
+
+    def test_one(self):
+        r = self.db.one("SELECT * FROM foo ORDER BY key LIMIT 1")
+        assert isinstance(r, Row)
+        assert r[0] == 'biz'
+        assert r.key == 'biz'
+        assert r['key'] == 'biz'
+        assert r[1] == 43
+        assert r.value == 43
+        assert r['value'] == 43
+        if sys.version_info >= (3, 0):
+            assert repr(r) == "Row(key='biz', value=43)"
+
+    def test_all(self):
+        rows = self.db.all("SELECT * FROM foo ORDER BY key")
+        assert isinstance(rows[0], Row)
+        assert rows[0].key == 'biz'
+        assert rows[0].value == 43
+        assert rows[1].key == 'buz'
+        assert rows[1].value == 42
+
+    def test_iter(self):
+        with self.db.get_cursor() as cursor:
+            cursor.execute("SELECT * FROM foo ORDER BY key")
+            i = iter(cursor)
+            assert cursor.rownumber == 0
+
+            t = next(i)
+            assert isinstance(t, Row)
+            assert t.key == 'biz'
+            assert t.value == 43
+            assert cursor.rownumber == 1
+            assert cursor.rowcount == 2
+
+            t = next(i)
+            assert isinstance(t, Row)
+            assert t.key == 'buz'
+            assert t.value == 42
+            assert cursor.rownumber == 2
+            assert cursor.rowcount == 2
+
+            with self.assertRaises(StopIteration):
+                next(i)
+            assert cursor.rownumber == 2
+            assert cursor.rowcount == 2
+
+    def test_row_unpack(self):
+        foo, bar = self.db.one("SELECT 1 as foo, 2 as bar")
+        assert foo == 1
+        assert bar == 2
+
+    def test_row_comparison(self):
+        r = self.db.one("SELECT 1 as foo, 2 as bar")
+        assert r == r
+        assert r == (1, 2)
+        assert r == {'foo': 1, 'bar': 2}
+        assert r != None
+
+    def test_special_col_names(self):
+        r = self.db.one('SELECT 1 as "foo.bar_baz", 2 as "?column?", 3 as "3"')
+        assert r['foo.bar_baz'] == 1
+        assert r['?column?'] == 2
+        assert r['3'] == 3
+
+    @mark.xfail(sys.version_info < (3, 0),
+                reason="Unicode attribute names require Python >= 3.0")
+    def test_nonascii_names(self):
+        r = self.db.one('SELECT 1 as \xe5h\xe9, 2 as \u2323')
+        assert getattr(r, '\xe5h\xe9') == 1
+        assert getattr(r, '\u2323') == 2
