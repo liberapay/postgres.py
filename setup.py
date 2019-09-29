@@ -4,8 +4,8 @@ from setuptools import setup, find_packages
 
 setup(
     name='postgres',
-    author='Gratipay, LLC',
-    author_email='chad@idelic.com',
+    author='Chad Whitacre et al.',
+    author_email='chad@zetaweb.com',
     description="postgres is a high-value abstraction over psycopg2.",
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
