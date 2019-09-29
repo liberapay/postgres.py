@@ -11,7 +11,7 @@ from inspect import isclass
 from operator import itemgetter
 
 from psycopg2.extensions import cursor as TupleCursor
-from psycopg2.extras import NamedTupleCursor, RealDictCursor
+from psycopg2.extras import NamedTupleCursor
 
 
 itemgetter0 = itemgetter(0)
@@ -81,6 +81,62 @@ class SimpleCursorBase(object):
 
     """
 
+    back_as = None
+
+    def __iter__(self):
+        it = TupleCursor.__iter__(self)
+        back_as = self.back_as
+        if back_as:
+            try:
+                back_as = self.connection.back_as_registry[back_as]
+            except KeyError:
+                raise BadBackAs(back_as)
+        while True:
+            try:
+                t = next(it)
+            except StopIteration:
+                return
+            yield (back_as(self.description, t) if back_as else t)
+
+    def fetchone(self, back_as=None):
+        t = TupleCursor.fetchone(self)
+        if t is not None:
+            back_as = back_as or self.back_as
+            if back_as:
+                try:
+                    back_as = self.connection.back_as_registry[back_as]
+                except KeyError:
+                    raise BadBackAs(back_as)
+                return back_as(self.description, out)
+            else:
+                return t
+
+    def fetchmany(self, size=None, back_as=None):
+        ts = TupleCursor.fetchmany(self, size)
+        cols = self.description
+        back_as = back_as or self.back_as
+        if back_as:
+            try:
+                back_as = self.connection.back_as_registry[back_as]
+            except KeyError:
+                raise BadBackAs(back_as)
+            return [back_as(cols, t) for t in ts]
+        else:
+            return t
+
+    def fetchall(self, back_as=None):
+        ts = TupleCursor.fetchall(self)
+        cols = self.description
+        back_as = back_as or self.back_as
+        if back_as:
+            try:
+                back_as = self.connection.back_as_registry[back_as]
+            except KeyError:
+                raise BadBackAs(back_as)
+            return [back_as(cols, t) for t in ts]
+        else:
+            return t
+
     def run(self, sql, parameters=None):
         """Execute a query and discard any results.
 
@@ -91,8 +147,7 @@ class SimpleCursorBase(object):
         """
         self.execute(sql, parameters)
 
-
-    def one(self, sql, parameters=None, default=None):
+    def one(self, sql, parameters=None, default=None, back_as=None):
         """Execute a query and return a single result or a default value.
 
         .. note::
@@ -104,7 +159,7 @@ class SimpleCursorBase(object):
         # fetch
         self.execute(sql, parameters)
         if self.rowcount == 1:
-            out = self.fetchone()
+            out = TupleCursor.fetchone(self)
         elif self.rowcount == 0:
             if isexception(default):
                 raise default
@@ -114,22 +169,26 @@ class SimpleCursorBase(object):
         else:
             raise TooMany(self.rowcount, 0, 1)
 
-        # dereference
         if len(out) == 1:
-            try:
-                out = out[0]
-            except LookupError:
-                if callable(getattr(out, 'values', None)):
-                    out = tuple(out.values())[0]
+            # dereference
+            out = out[0]
             if out is None:
                 if isexception(default):
                     raise default
                 return default
+        else:
+            # transform
+            back_as = back_as or self.back_as
+            if back_as:
+                try:
+                    back_as = self.connection.back_as_registry[back_as]
+                except KeyError:
+                    raise BadBackAs(back_as)
+                out = back_as(self.description, out)
 
         return out
 
-
-    def all(self, sql, parameters=None):
+    def all(self, sql, parameters=None, back_as=None):
         """Execute a query and return all results.
 
         .. note::
@@ -138,15 +197,37 @@ class SimpleCursorBase(object):
 
         """
         self.execute(sql, parameters)
-        recs = self.fetchall()
-        if recs and len(recs[0]) == 1:
-            # dereference
-            try:
+        recs = TupleCursor.fetchall(self)
+        if recs:
+            if len(recs[0]) == 1:
+                # dereference
                 recs = list(map(itemgetter0, recs))
-            except LookupError:
-                if callable(getattr(recs[0], 'values', None)):
-                    recs = [tuple(rec.values())[0] for rec in recs]
+            else:
+                # transform
+                back_as = back_as or self.back_as
+                if back_as:
+                    try:
+                        back_as = self.connection.back_as_registry[back_as]
+                    except KeyError:
+                        raise BadBackAs(back_as)
+                    recs = [back_as(self.description, r) for r in recs]
         return recs
+
+
+def make_dict(cols, vals):
+    return dict(zip(map(itemgetter0, cols), vals))
+
+
+def make_namedtuple(cols, vals):
+    # We use the NamedTupleCursor cache introduced in psycopg2 2.8.
+    # See https://github.com/psycopg/psycopg2/issues/838 for details.
+    key = tuple(map(itemgetter0, cols))
+    cls = NamedTupleCursor._cached_make_nt(key)
+    return cls(*vals)
+
+
+def return_tuple_as_is(cols, vals):
+    return vals
 
 
 class Row(object):
@@ -213,39 +294,6 @@ class Row(object):
         return tuple(map(itemgetter0, self._cols))
 
 
-class RowCursor(TupleCursor):
-    """A cursor subclass that generates :class:`Row` objects.
-    """
-
-    def fetchone(self):
-        """"""
-        t = TupleCursor.fetchone(self)
-        if t is not None:
-            return Row(self.description, t)
-
-    def fetchmany(self, size=None):
-        """"""
-        ts = TupleCursor.fetchmany(self, size)
-        cols = self.description
-        return [Row(cols, t) for t in ts]
-
-    def fetchall(self):
-        """"""
-        ts = TupleCursor.fetchall(self)
-        cols = self.description
-        return [Row(cols, t) for t in ts]
-
-    def __iter__(self):
-        """"""
-        it = TupleCursor.__iter__(self)
-        while True:
-            try:
-                t = next(it)
-            except StopIteration:
-                return
-            yield Row(self.description, t)
-
-
 class SimpleTupleCursor(SimpleCursorBase, TupleCursor):
     """A `simple cursor`_ that returns tuples.
 
@@ -253,7 +301,8 @@ class SimpleTupleCursor(SimpleCursorBase, TupleCursor):
     a large number of rows at once, because tuples occupy less memory than dicts.
     """
 
-class SimpleNamedTupleCursor(SimpleCursorBase, NamedTupleCursor):
+
+class SimpleNamedTupleCursor(SimpleCursorBase, TupleCursor):
     """A `simple cursor`_ that returns namedtuples.
 
     This type of cursor is especially well suited if you need to fetch and process
@@ -261,14 +310,20 @@ class SimpleNamedTupleCursor(SimpleCursorBase, NamedTupleCursor):
     objects to be more evolved than simple tuples.
     """
 
-class SimpleDictCursor(SimpleCursorBase, RealDictCursor):
+    back_as = 'namedtuple'
+
+
+class SimpleDictCursor(SimpleCursorBase, TupleCursor):
     """A `simple cursor`_ that returns dicts.
 
     This type of cursor is especially well suited if you don't care about the
     order of the columns and don't need to access them as attributes.
     """
 
-class SimpleRowCursor(SimpleCursorBase, RowCursor):
+    back_as = 'dict'
+
+
+class SimpleRowCursor(SimpleCursorBase, TupleCursor):
     """A `simple cursor`_ that returns :class:`Row` objects.
 
     This type of cursor is especially well suited if you want rows to be mutable.
@@ -295,6 +350,8 @@ class SimpleRowCursor(SimpleCursorBase, RowCursor):
     instances of the :class:`dict` class and they don't have its methods
     (:meth:`~dict.get`, :meth:`~dict.items`, etc.).
     """
+
+    back_as = 'Row'
 
 
 def isexception(obj):
