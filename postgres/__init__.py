@@ -486,18 +486,14 @@ class Postgres(object):
         >>> db.one("SELECT sum(baz) FROM foo WHERE bar='nope'", default=0)
         0
 
-        Dereferencing will use :meth:`.values` if it exists on the record,
-        so it should work for both mappings and sequences.
+        Dereferencing isn't performed if a :attr:`back_as` argument is provided:
 
-        >>> db.one( "SELECT sum(baz) FROM foo WHERE bar='nope'"
-        ...       , back_as=dict
-        ...       , default=0
-        ...        )
-        0
+        >>> db.one("SELECT null as foo", back_as=dict)
+        {'foo': None}
 
         """
-        with self.get_cursor(back_as=back_as, **kw) as cursor:
-            return cursor.one(sql, parameters, default)
+        with self.get_cursor(**kw) as cursor:
+            return cursor.one(sql, parameters, default, back_as=back_as)
 
 
     def all(self, sql, parameters=None, back_as=None, **kw):
@@ -543,16 +539,14 @@ class Postgres(object):
         >>> db.all("SELECT baz FROM foo ORDER BY bar")
         [537, 42]
 
-        This works for record types that are mappings (anything with a
-        :meth:`__len__` and a :meth:`values` method) as well those that
-        are sequences:
+        Unless a :attr:`back_as` argument is provided:
 
         >>> db.all("SELECT baz FROM foo ORDER BY bar", back_as=dict)
-        [537, 42]
+        [{'baz': 537}, {'baz': 42}]
 
         """
-        with self.get_cursor(back_as=back_as, **kw) as cursor:
-            return cursor.all(sql, parameters)
+        with self.get_cursor(**kw) as cursor:
+            return cursor.all(sql, parameters, back_as=back_as)
 
 
     def get_cursor(self, **kw):

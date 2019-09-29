@@ -169,7 +169,7 @@ class SimpleCursorBase(object):
         else:
             raise TooMany(self.rowcount, 0, 1)
 
-        if len(out) == 1:
+        if len(out) == 1 and back_as is None:
             # dereference
             out = out[0]
             if out is None:
@@ -199,7 +199,7 @@ class SimpleCursorBase(object):
         self.execute(sql, parameters)
         recs = TupleCursor.fetchall(self)
         if recs:
-            if len(recs[0]) == 1:
+            if len(recs[0]) == 1 and back_as is None:
                 # dereference
                 recs = list(map(itemgetter0, recs))
             else:
