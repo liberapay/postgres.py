@@ -182,8 +182,8 @@ from inspect import isclass
 from postgres.context_managers import ConnectionContextManager
 from postgres.context_managers import CursorContextManager
 from postgres.cursors import (
-    Row, SimpleCursorBase, SimpleDictCursor, SimpleNamedTupleCursor,
-    SimpleRowCursor, SimpleTupleCursor,
+    make_dict, make_namedtuple, return_tuple_as_is,
+    Row, SimpleCursorBase, SimpleNamedTupleCursor,
 )
 from postgres.orm import Model
 from psycopg2 import DataError, InterfaceError, ProgrammingError
@@ -271,14 +271,14 @@ class BadBackAs(Exception):
 # ==============
 
 default_back_as_registry = {
-    tuple: SimpleTupleCursor,
-    'tuple': SimpleTupleCursor,
-    namedtuple: SimpleNamedTupleCursor,
-    'namedtuple': SimpleNamedTupleCursor,
-    dict: SimpleDictCursor,
-    'dict': SimpleDictCursor,
-    Row: SimpleRowCursor,
-    'Row': SimpleRowCursor,
+    tuple: return_tuple_as_is,
+    'tuple': return_tuple_as_is,
+    dict: make_dict,
+    'dict': make_dict,
+    namedtuple: make_namedtuple,
+    'namedtuple': make_namedtuple,
+    Row: Row,
+    'Row': Row,
 }
 
 
@@ -294,8 +294,8 @@ class Postgres(object):
         cursors readonly by default.
     :param cursor_factory: Defaults to
         :class:`~postgres.cursors.SimpleNamedTupleCursor`
-    :param dict back_as_registry: Defines the values that can be passed in the
-        :obj:`back_as` argument of :meth:`one()` and :meth:`all`.
+    :param dict back_as_registry: Defines the values that can be passed to
+        various methods as a :obj:`back_as` argument.
 
     This is the main object that :mod:`postgres` provides, and you should
     have one instance per process for each PostgreSQL database your process
@@ -472,17 +472,7 @@ class Postgres(object):
 
         That's a convenience so you don't have to go to the trouble of
         remembering where :class:`~postgres.cursors.SimpleDictCursor` lives
-        and importing it in order to get dictionaries back. If you do need more
-        control (maybe you have a custom cursor class), you can pass
-        :attr:`cursor_factory` explicitly, and that will override any
-        :attr:`back_as`:
-
-        >>> from postgres.cursors import SimpleTupleCursor
-        >>> db.one( "SELECT * FROM foo WHERE bar='buz'"
-        ...       , back_as=dict
-        ...       , cursor_factory=SimpleTupleCursor
-        ...        )
-        ('buz', 42)
+        and importing it in order to get dictionaries back.
 
         If the query result has only one column, then we dereference that for
         you.
@@ -496,18 +486,14 @@ class Postgres(object):
         >>> db.one("SELECT sum(baz) FROM foo WHERE bar='nope'", default=0)
         0
 
-        Dereferencing will use :meth:`.values` if it exists on the record,
-        so it should work for both mappings and sequences.
+        Dereferencing isn't performed if a :attr:`back_as` argument is provided:
 
-        >>> db.one( "SELECT sum(baz) FROM foo WHERE bar='nope'"
-        ...       , back_as=dict
-        ...       , default=0
-        ...        )
-        0
+        >>> db.one("SELECT null as foo", back_as=dict)
+        {'foo': None}
 
         """
-        with self.get_cursor(back_as=back_as, **kw) as cursor:
-            return cursor.one(sql, parameters, default)
+        with self.get_cursor(**kw) as cursor:
+            return cursor.one(sql, parameters, default, back_as=back_as)
 
 
     def all(self, sql, parameters=None, back_as=None, **kw):
@@ -545,17 +531,7 @@ class Postgres(object):
 
         That's a convenience so you don't have to go to the trouble of
         remembering where :class:`~postgres.cursors.SimpleDictCursor` lives
-        and importing it in order to get dictionaries back. If you do need more
-        control (maybe you have a custom cursor class), you can pass
-        :attr:`cursor_factory` explicitly, and that will override any
-        :attr:`back_as`:
-
-        >>> from postgres.cursors import SimpleTupleCursor
-        >>> db.all( "SELECT * FROM foo ORDER BY bar"
-        ...       , back_as=dict
-        ...       , cursor_factory=SimpleTupleCursor
-        ...        )
-        [('bit', 537), ('buz', 42)]
+        and importing it in order to get dictionaries back.
 
         If the query results in records with a single column, we return a list
         of the values in that column rather than a list of records of values.
@@ -563,16 +539,14 @@ class Postgres(object):
         >>> db.all("SELECT baz FROM foo ORDER BY bar")
         [537, 42]
 
-        This works for record types that are mappings (anything with a
-        :meth:`__len__` and a :meth:`values` method) as well those that
-        are sequences:
+        Unless a :attr:`back_as` argument is provided:
 
         >>> db.all("SELECT baz FROM foo ORDER BY bar", back_as=dict)
-        [537, 42]
+        [{'baz': 537}, {'baz': 42}]
 
         """
-        with self.get_cursor(back_as=back_as, **kw) as cursor:
-            return cursor.all(sql, parameters)
+        with self.get_cursor(**kw) as cursor:
+            return cursor.all(sql, parameters, back_as=back_as)
 
 
     def get_cursor(self, **kw):
@@ -768,19 +742,11 @@ def make_Connection(postgres):
     connection pool.
 
     The :meth:`cursor` method of this class accepts a :attr:`back_as`
-    keyword argument. If a :attr:`cursor_factory` keyword argument is also
-    given, then any :attr:`back_as` is ignored and discarded.  Valid values
-    for :attr:`back_as` are :class:`tuple`, :class:`namedtuple`,
-    :class:`dict` (or the strings ``tuple``, ``namedtuple``, and ``dict``),
-    and :class:`None`. If the value of :attr:`back_as` is
-    :class:`None`, then we'll use the default :attr:`cursor_factory` with
-    which our parent :class:`~postgres.Postgres` instance was instantiated.
-    If :attr:`back_as` is not :class:`None`, then we'll specify a
-    :attr:`cursor_factory` that will result in records of the designated
-    type: :class:`postgres.cursor.SimpleTupleCursor` for :class:`tuple`,
-    :class:`postgres.cursor.SimpleNamedTupleCursor` for
-    :class:`namedtuple`, and :class:`postgres.cursor.SimpleDictCursor`
-    for :class:`dict`.
+    keyword argument. By default the valid values for :attr:`back_as` are
+    :class:`tuple`, :class:`namedtuple`, :class:`dict` and :class:`Row` (or the
+    strings ``tuple``, ``namedtuple``, ``dict``, ``Row``), and :class:`None`.
+    If :attr:`back_as` is not :class:`None`, then it modifies the default row
+    type of the cursor.
 
     We also set client encoding to ``UTF-8``.
 
@@ -811,13 +777,12 @@ def make_Connection(postgres):
                     pass
 
         def cursor(self, back_as=None, **kw):
-            if back_as is not None and 'cursor_factory' not in kw:
-                # Compute cursor_factory from back_as.
-                try:
-                    kw['cursor_factory'] = self.back_as_registry[back_as]
-                except KeyError:
+            cursor = super(Connection, self).cursor(**kw)
+            if back_as is not None:
+                if back_as not in self.back_as_registry:
                     raise BadBackAs(back_as)
-            return psycopg2.extensions.connection.cursor(self, **kw)
+                cursor.back_as = back_as
+            return cursor
 
         get_cursor = cursor
 
