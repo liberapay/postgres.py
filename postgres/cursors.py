@@ -79,6 +79,11 @@ class SimpleCursorBase(object):
         ...
     AttributeError: 'LoggingCursor' object has no attribute 'all'
 
+    .. attribute:: back_as
+
+        Determines which type of row is returned by the various methods. The valid
+        values are the keys of the :attr:`~postgres.Postgres.back_as_registry`.
+
     """
 
     back_as = None
