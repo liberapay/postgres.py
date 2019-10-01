@@ -179,8 +179,9 @@ from collections import namedtuple
 
 import psycopg2
 from inspect import isclass
-from postgres.context_managers import ConnectionContextManager
-from postgres.context_managers import CursorContextManager
+from postgres.context_managers import (
+    ConnectionContextManager, CursorContextManager, CursorSubcontextManager,
+)
 from postgres.cursors import (
     make_dict, make_namedtuple, return_tuple_as_is,
     Row, SimpleCursorBase, SimpleNamedTupleCursor,
@@ -323,9 +324,8 @@ class Postgres(object):
     by this :class:`~postgres.Postgres` instance will use. See the
     :ref:`simple-cursors` documentation below for additional options. Whatever
     default you set here, you can override that default on a per-call basis by
-    passing :attr:`back_as` or :attr:`cursor_factory` to
-    :meth:`~postgres.Postgres.one`, :meth:`~postgres.Postgres.all`, and
-    :meth:`~postgres.Postgres.get_cursor`.
+    passing :attr:`cursor_factory` to :meth:`~postgres.Postgres.one`,
+    :meth:`~postgres.Postgres.all`, and :meth:`~postgres.Postgres.get_cursor`.
 
     The names in our simple API, :meth:`~postgres.Postgres.run`,
     :meth:`~postgres.Postgres.one`, and :meth:`~postgres.Postgres.all`,
@@ -549,10 +549,13 @@ class Postgres(object):
             return cursor.all(sql, parameters, back_as=back_as)
 
 
-    def get_cursor(self, **kw):
+    def get_cursor(self, cursor=None, **kw):
         """Return a :class:`.CursorContextManager` that uses our connection pool.
 
-        :param kw: passed through to :class:`.CursorContextManager`
+        :param cursor: use an existing cursor instead of creating a new one
+            (see the explanations and caveats below)
+        :param kw: passed through to :class:`.CursorContextManager` or
+            :class:`.CursorSubcontextManager`
 
         >>> with db.get_cursor() as cursor:
         ...     cursor.all("SELECT * FROM foo")
@@ -580,7 +583,30 @@ class Postgres(object):
         transaction, but you don't need fine-grained control over the
         transaction.
 
+        The `cursor` argument enables running queries in a subtransaction. The
+        major difference between a transaction and a subtransaction is that the
+        changes in the database are **not** committed (nor rolled back) at the
+        end of a subtransaction.
+
+        The `cursor` argument is typically used inside functions which have an
+        optional `cursor` argument themselves, like this:
+
+        >>> def do_something(cursor=None):
+        ...     with db.get_cursor(cursor=cursor) as c:
+        ...         foo = c.one("...")
+        ...         # ... do more stuff
+        ...     # Warning: At this point you cannot assume that the changes have
+        ...     # been committed, so don't do anything that could be problematic
+        ...     # or incoherent if the transaction ends up being rolled back.
+
+        When the `cursor` argument isn't :obj:`None`, the `back_as` argument is
+        still supported, but the other arguments (`autocommit`, `readonly`, and
+        the arguments of the :meth:`psycopg2:connection.cursor` method) are
+        **not** supported.
+
         """
+        if cursor:
+            return CursorSubcontextManager(cursor, **kw)
         kw.setdefault('readonly', self.readonly)
         return CursorContextManager(self.pool, **kw)
 

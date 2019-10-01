@@ -49,6 +49,32 @@ class CursorContextManager(object):
         self.pool.putconn(self.conn)
 
 
+class CursorSubcontextManager(object):
+    """Wraps a cursor so that it can be used for a subtransaction.
+
+    See :meth:`~postgres.Postgres.get_cursor` for an explanation of subtransactions.
+
+    :param cursor: the :class:`psycopg2:cursor` to wrap
+    :param back_as: temporarily overwrites the cursor's
+        :attr:`~postgres.cursors.SimpleCursorBase.back_as` attribute
+
+    """
+
+    __slots__ = ('cursor', 'back_as', 'outer_back_as')
+
+    def __init__(self, cursor, back_as=None):
+        self.cursor = cursor
+        self.back_as = back_as
+
+    def __enter__(self):
+        self.outer_back_as = self.cursor.back_as
+        self.cursor.back_as = self.back_as
+        return self.cursor
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.cursor.back_as = self.outer_back_as
+
+
 class ConnectionContextManager(object):
     """Instantiated once per :func:`~postgres.Postgres.get_connection` call.
 
