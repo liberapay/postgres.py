@@ -74,7 +74,8 @@ class SimpleCursorBase(object):
     However, we do allow you to use whatever you want as the
     :attr:`cursor_factory` argument for individual calls:
 
-    >>> db.all("SELECT * FROM foo", cursor_factory=LoggingCursor)
+    >>> with db.get_cursor(cursor_factory=LoggingCursor) as cursor:
+    ...     cursor.all("SELECT * FROM foo")
     Traceback (most recent call last):
         ...
     AttributeError: 'LoggingCursor' object has no attribute 'all'
@@ -102,6 +103,11 @@ class SimpleCursorBase(object):
             except StopIteration:
                 return
             yield (back_as(self.description, t) if back_as else t)
+
+    def execute(self, sql, **kw):
+        """This method is an alias of :meth:`run`.
+        """
+        self.run(sql, **kw)
 
     def fetchone(self, back_as=None):
         t = TupleCursor.fetchone(self)
@@ -142,27 +148,121 @@ class SimpleCursorBase(object):
         else:
             return t
 
-    def run(self, sql, parameters=None):
-        """Execute a query and discard any results.
+    def run(self, sql, paramaters=None, **kw):
+        """Execute a query, without returning any results.
 
-        .. note::
+        :param str sql: the SQL statement to execute
+        :param parameters: the `bind parameters`_ for the SQL statement
+        :type parameters: dict or tuple
+        :param kw: alternative to passing a :class:`dict` as `parameters`
 
-            See the documentation at :meth:`postgres.Postgres.run`.
+        .. _bind parameters: #bind-parameters
+
+        Example usage:
+
+        >>> db.run("DROP TABLE IF EXISTS foo CASCADE")
+        >>> db.run("CREATE TABLE foo (bar text, baz int)")
+        >>> bar, baz = 'buz', 42
+        >>> db.run("INSERT INTO foo VALUES (%s, %s)", (bar, baz))
+        >>> db.run("INSERT INTO foo VALUES (%(bar)s, %(baz)s)", dict(bar=bar, baz=baz))
+        >>> db.run("INSERT INTO foo VALUES (%(bar)s, %(baz)s)", bar=bar, baz=baz)
 
         """
-        self.execute(sql, parameters)
+        if kw:
+            if paramaters:
+                paramaters.update(kw)
+            else:
+                paramaters = kw
+        TupleCursor.execute(self, sql, paramaters)
 
-    def one(self, sql, parameters=None, default=None, back_as=None):
+    def one(self, sql, parameters=None, default=None, back_as=None, **kw):
         """Execute a query and return a single result or a default value.
 
-        .. note::
+        :param str sql: the SQL statement to execute
+        :param parameters: the `bind parameters`_ for the SQL statement
+        :type parameters: dict or tuple
+        :param default: the value to return or raise if no results are found
+        :param back_as: the type of record to return
+        :type back_as: type or string
+        :param kw: alternative to passing a :class:`dict` as `parameters`
 
-            See the documentation at :meth:`postgres.Postgres.one`.
+        :returns: a single record or value, or :attr:`default` (if
+            :attr:`default` is not an :class:`Exception`)
+
+        :raises: :exc:`~postgres.TooFew` or :exc:`~postgres.TooMany`,
+            or :attr:`default` (if :attr:`default` is an
+            :class:`Exception`)
+
+        .. _bind parameters: #bind-parameters
+
+        Use this for the common case where there should only be one record, but
+        it may not exist yet.
+
+        >>> db.one("SELECT * FROM foo WHERE bar='buz'")
+        Record(bar='buz', baz=42)
+
+        If the record doesn't exist, we return :class:`None`:
+
+        >>> record = db.one("SELECT * FROM foo WHERE bar='blam'")
+        >>> if record is None:
+        ...     print("No blam yet.")
+        ...
+        No blam yet.
+
+        If you pass :attr:`default` we'll return that instead of :class:`None`:
+
+        >>> db.one("SELECT * FROM foo WHERE bar='blam'", default=False)
+        False
+
+        If you pass an :class:`Exception` instance or subclass for
+        :attr:`default`, we will raise that for you:
+
+        >>> db.one("SELECT * FROM foo WHERE bar='blam'", default=Exception)
+        Traceback (most recent call last):
+            ...
+        Exception
+
+        We specifically stop short of supporting lambdas or other callables for
+        the :attr:`default` parameter. That gets complicated quickly, and
+        it's easy to just check the return value in the caller and do your
+        extra logic there.
+
+        You can use :attr:`back_as` to override the type associated with the
+        default :attr:`cursor_factory` for your
+        :class:`~postgres.Postgres` instance:
+
+        >>> db.default_cursor_factory
+        <class 'postgres.cursors.SimpleNamedTupleCursor'>
+        >>> db.one( "SELECT * FROM foo WHERE bar='buz'"
+        ...       , back_as=dict
+        ...        )
+        {'bar': 'buz', 'baz': 42}
+
+        That's a convenience so you don't have to go to the trouble of
+        remembering where :class:`~postgres.cursors.SimpleDictCursor` lives
+        and importing it in order to get dictionaries back.
+
+        If the query result has only one column, then we dereference that for
+        you.
+
+        >>> db.one("SELECT baz FROM foo WHERE bar='buz'")
+        42
+
+        And if the dereferenced value is :class:`None`, we return the value
+        of :attr:`default`:
+
+        >>> db.one("SELECT sum(baz) FROM foo WHERE bar='nope'", default=0)
+        0
+
+        Dereferencing isn't performed if a :attr:`back_as` argument is provided:
+
+        >>> db.one("SELECT null as foo", back_as=dict)
+        {'foo': None}
 
         """
 
         # fetch
-        self.execute(sql, parameters)
+        self.run(sql, parameters, **kw)
         if self.rowcount == 1:
             out = TupleCursor.fetchone(self)
         elif self.rowcount == 0:
@@ -193,15 +293,51 @@ class SimpleCursorBase(object):
 
         return out
 
-    def all(self, sql, parameters=None, back_as=None):
+    def all(self, sql, parameters=None, back_as=None, **kw):
         """Execute a query and return all results.
 
-        .. note::
+        :param str sql: the SQL statement to execute
+        :param parameters: the `bind parameters`_ for the SQL statement
+        :type parameters: dict or tuple
+        :param back_as: the type of record to return
+        :type back_as: type or string
+        :param kw: alternative to passing a :class:`dict` as `parameters`
 
-            See the documentation at :meth:`postgres.Postgres.all`.
+        :returns: :class:`list` of records or :class:`list` of single values
+
+        .. _bind parameters: #bind-parameters
+
+        Use it like this:
+
+        >>> db.all("SELECT * FROM foo ORDER BY bar")
+        [Record(bar='bit', baz=537), Record(bar='buz', baz=42)]
+
+        You can use :attr:`back_as` to override the type associated with the
+        default :attr:`cursor_factory` for your
+        :class:`~postgres.Postgres` instance:
+
+        >>> db.default_cursor_factory
+        <class 'postgres.cursors.SimpleNamedTupleCursor'>
+        >>> db.all("SELECT * FROM foo ORDER BY bar", back_as=dict)
+        [{'bar': 'bit', 'baz': 537}, {'bar': 'buz', 'baz': 42}]
+
+        That's a convenience so you don't have to go to the trouble of
+        remembering where :class:`~postgres.cursors.SimpleDictCursor` lives
+        and importing it in order to get dictionaries back.
+
+        If the query results in records with a single column, we return a list
+        of the values in that column rather than a list of records of values.
+
+        >>> db.all("SELECT baz FROM foo ORDER BY bar")
+        [537, 42]
+
+        Unless a :attr:`back_as` argument is provided:
+
+        >>> db.all("SELECT baz FROM foo ORDER BY bar", back_as=dict)
+        [{'baz': 537}, {'baz': 42}]
 
         """
-        self.execute(sql, parameters)
+        self.run(sql, parameters, **kw)
         recs = TupleCursor.fetchall(self)
         if recs:
             if len(recs[0]) == 1 and back_as is None:
@@ -375,5 +511,8 @@ if __name__ == '__main__':
     db = Postgres()
     db.run("DROP SCHEMA IF EXISTS public CASCADE")
     db.run("CREATE SCHEMA public")
+    db.run("CREATE TABLE foo (bar text, baz int)")
+    db.run("INSERT INTO foo VALUES ('buz', 42)")
+    db.run("INSERT INTO foo VALUES ('bit', 537)")
     import doctest
     doctest.testmod()
