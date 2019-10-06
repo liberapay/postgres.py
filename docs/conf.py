@@ -90,8 +90,9 @@ pygments_style = 'sphinx'
 primary_domain = 'py'
 
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/3.7/', None),
+    'python': ('https://docs.python.org/3/', None),
     'psycopg2': ('http://initd.org/psycopg/docs/', None),
+    'psycopg2-pool': ('https://psycopg2-pool.readthedocs.io/en/latest/', None),
 }
 
 

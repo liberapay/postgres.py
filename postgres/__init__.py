@@ -194,7 +194,7 @@ from postgres.cursors import (
 from postgres.orm import Model
 from psycopg2 import DataError, InterfaceError, ProgrammingError
 from psycopg2.extras import register_composite, CompositeCaster
-from psycopg2.pool import ThreadedConnectionPool as ConnectionPool
+from psycopg2_pool import ThreadSafeConnectionPool
 
 
 __version__ = '2.2.2'
@@ -291,17 +291,20 @@ default_back_as_registry = {
 class Postgres(object):
     """Interact with a `PostgreSQL <http://www.postgresql.org/>`_ database.
 
-    :param unicode url: A ``postgres://`` URL or a `PostgreSQL connection
-        string
+    :param str url: A ``postgres://`` URL or a `PostgreSQL connection string
         <http://www.postgresql.org/docs/current/static/libpq-connect.html>`_
     :param int minconn: The minimum size of the connection pool
     :param int maxconn: The maximum size of the connection pool
+    :param int idle_timeout: How many seconds to wait before closing an idle
+        connection.
     :param bool readonly: Setting this to :obj:`True` makes all connections and
         cursors readonly by default.
-    :param cursor_factory: Defaults to
-        :class:`~postgres.cursors.SimpleNamedTupleCursor`
+    :param type cursor_factory: The type of cursor to use when none is specified.
+        Defaults to :class:`~postgres.cursors.SimpleNamedTupleCursor`.
     :param dict back_as_registry: Defines the values that can be passed to
         various methods as a :obj:`back_as` argument.
+    :param type pool_class: The type of pool to use. Defaults to
+        :class:`~psycopg2_pool.ThreadSafeConnectionPool`.
 
     This is the main object that :mod:`postgres` provides, and you should
     have one instance per process for each PostgreSQL database your process
@@ -319,11 +322,11 @@ class Postgres(object):
     determine the connection parameters which are not explicitly passed in the
     :attr:`url` argument.
 
-    When instantiated, this object creates a `thread-safe connection pool
-    <http://initd.org/psycopg/docs/pool.html#psycopg2.pool.ThreadedConnectionPool>`_,
-    which opens :attr:`minconn` connections immediately, and up to
-    :attr:`maxconn` according to demand. Everything this object provides
-    runs through this connection pool.
+    When instantiated, this object creates a connection pool by calling
+    `pool_class` with the `minconn`, `maxconn` and `idle_timeout` arguments.
+    Everything this object provides runs through this connection pool. See the
+    documentation of the :class:`~psycopg2_pool.ConnectionPool` class for more
+    information.
 
     :attr:`cursor_factory` sets the default cursor that connections managed
     by this :class:`~postgres.Postgres` instance will use. See the
@@ -349,9 +352,10 @@ class Postgres(object):
 
     """
 
-    def __init__(self, url='', minconn=1, maxconn=10, readonly=False,
-                 cursor_factory=SimpleNamedTupleCursor,
-                 back_as_registry=default_back_as_registry):
+    def __init__(self, url='', minconn=1, maxconn=10, idle_timeout=600,
+                 readonly=False, cursor_factory=SimpleNamedTupleCursor,
+                 back_as_registry=default_back_as_registry,
+                 pool_class=ThreadSafeConnectionPool):
         if url.startswith("postgres://"):
             dsn = url_to_dsn(url)
         else:
@@ -367,11 +371,10 @@ class Postgres(object):
         self.back_as_registry = back_as_registry
         self.default_cursor_factory = cursor_factory
         Connection = make_Connection(self)
-        self.pool = ConnectionPool( minconn=minconn
-                                  , maxconn=maxconn
-                                  , dsn=dsn
-                                  , connection_factory=Connection
-                                   )
+        self.pool = pool_class(
+            minconn=minconn, maxconn=maxconn, idle_timeout=idle_timeout,
+            dsn=dsn, connection_factory=Connection,
+        )
 
         # Set up orm helpers.
         # ===================
