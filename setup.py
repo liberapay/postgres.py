@@ -10,7 +10,7 @@ setup(
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     url='https://postgres-py.readthedocs.org',
-    version='2.2.2',
+    version='3.0',
     packages=find_packages(),
     install_requires=['psycopg2-binary >= 2.8', 'psycopg2-pool'],
     classifiers=[
