@@ -11,7 +11,7 @@ setup( name='postgres'
      , url='https://postgres-py.readthedocs.org'
      , version='2.2.2'
      , packages=find_packages()
-     , install_requires=['psycopg2-binary >= 2.8']
+     , install_requires=['psycopg2-binary >= 2.8', 'psycopg2-pool']
      , classifiers=[
          'Development Status :: 5 - Production/Stable',
          'Intended Audience :: Developers',
