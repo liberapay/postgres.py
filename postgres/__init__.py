@@ -698,6 +698,10 @@ def make_Connection(postgres):
 
         def get_cursor(self, cursor=None, **kw):
             if cursor:
+                if cursor.connection is not self:
+                    raise ValueError(
+                        "the provided cursor is from a different connection"
+                    )
                 return CursorSubcontextManager(cursor, **kw)
             return ConnectionCursorContextManager(self, **kw)
 

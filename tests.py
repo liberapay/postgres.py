@@ -320,6 +320,11 @@ class TestConnection(WithData):
             actual = cursor.fetchall()
         assert actual == [{"bar": "buz"}]
 
+    def test_get_cursor_method_checks_cursor_argument(self):
+        with self.db.get_connection() as conn, self.db.get_cursor() as cursor:
+            with self.assertRaises(ValueError):
+                conn.get_cursor(cursor=cursor)
+
 
 # orm
 # ===
