@@ -6,7 +6,7 @@ from psycopg2 import InterfaceError
 class CursorContextManager(object):
     """Instantiated once per :func:`~postgres.Postgres.get_cursor` call.
 
-    :param pool: see :mod:`psycopg2.pool`
+    :param pool: see :mod:`psycopg2_pool`
     :param bool autocommit: see :attr:`psycopg2:connection.autocommit`
     :param bool readonly: see :attr:`psycopg2:connection.readonly`
     :param \**cursor_kwargs: passed to :meth:`psycopg2:connection.cursor`
@@ -120,7 +120,7 @@ class CursorSubcontextManager(object):
 class ConnectionContextManager(object):
     """Instantiated once per :func:`~postgres.Postgres.get_connection` call.
 
-    :param pool: see :mod:`psycopg2.pool`
+    :param pool: see :mod:`psycopg2_pool`
     :param bool autocommit: see :attr:`psycopg2:connection.autocommit`
     :param bool readonly: see :attr:`psycopg2:connection.readonly`
 
