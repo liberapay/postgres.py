@@ -186,6 +186,7 @@ import psycopg2
 from inspect import isclass
 from postgres.context_managers import (
     ConnectionContextManager, CursorContextManager, CursorSubcontextManager,
+    ConnectionCursorContextManager,
 )
 from postgres.cursors import (
     make_dict, make_namedtuple, return_tuple_as_is,
@@ -695,7 +696,14 @@ def make_Connection(postgres):
                 cursor.back_as = back_as
             return cursor
 
-        get_cursor = cursor
+        def get_cursor(self, cursor=None, **kw):
+            if cursor:
+                if cursor.connection is not self:
+                    raise ValueError(
+                        "the provided cursor is from a different connection"
+                    )
+                return CursorSubcontextManager(cursor, **kw)
+            return ConnectionCursorContextManager(self, **kw)
 
     return Connection
 
