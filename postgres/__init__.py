@@ -167,8 +167,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import sys
 if sys.version_info[0] == 2:    # Python 2
-    import urlparse
-
     # "Note: In Python 2, if you want to uniformly receive all your database
     # input in Unicode, you can register the related typecasters globally as
     # soon as Psycopg is imported."
@@ -178,8 +176,6 @@ if sys.version_info[0] == 2:    # Python 2
     psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
     psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
-else:                           # Python 3
-    import urllib.parse as urlparse
 from collections import namedtuple
 
 import psycopg2
@@ -199,37 +195,6 @@ from psycopg2_pool import ThreadSafeConnectionPool
 
 
 __version__ = '2.2.2'
-
-
-# A Helper
-# ========
-# Heroku gives us an URL, psycopg2 wants a DSN. Convert!
-
-if 'postgres' not in urlparse.uses_netloc:
-    # Teach urlparse about postgres:// URLs.
-    urlparse.uses_netloc.append('postgres')
-
-def url_to_dsn(url):
-    parsed = urlparse.urlparse(url)
-    dbname = parsed.path[1:] # /foobar
-    user = parsed.username
-    password = parsed.password
-    host = parsed.hostname
-    port = parsed.port
-    if port is None:
-        port = '5432' # postgres default port
-
-    dsn = "dbname=" + dbname
-    if user is not None:
-        dsn += " user=" + user
-    if password is not None:
-        dsn += " password=" + password
-    if host is not None:
-        dsn += " host=" + host
-    if port is not None:
-        dsn += " port=" + str(port)
-
-    return dsn
 
 
 # Exceptions
@@ -357,10 +322,6 @@ class Postgres(object):
                  readonly=False, cursor_factory=SimpleNamedTupleCursor,
                  back_as_registry=default_back_as_registry,
                  pool_class=ThreadSafeConnectionPool):
-        if url.startswith("postgres://"):
-            dsn = url_to_dsn(url)
-        else:
-            dsn = url
 
         self.readonly = readonly
 
@@ -374,7 +335,7 @@ class Postgres(object):
         Connection = make_Connection(self)
         self.pool = pool_class(
             minconn=minconn, maxconn=maxconn, idle_timeout=idle_timeout,
-            dsn=dsn, connection_factory=Connection,
+            dsn=url, connection_factory=Connection,
         )
 
         # Set up orm helpers.
