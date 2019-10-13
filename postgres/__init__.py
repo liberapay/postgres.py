@@ -195,7 +195,7 @@ if sys.version_info[0] == 2:    # Python 2
     psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
 
-__version__ = '3.0'
+__version__ = '3.0.0'
 
 
 # Exceptions
