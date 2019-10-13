@@ -384,22 +384,22 @@ class TestORM(WithData):
         raises(NotAModel, self.db.check_registration, obj)
 
     def test_check_register_doesnt_include_subsubclasses(self):
-        class Other(self.MyModel): pass
+        class Other(self.MyModel): pass  # noqa: E701
         raises(NotRegistered, self.db.check_registration, Other)
 
     def test_dot_dot_dot_unless_you_ask_it_to(self):
-        class Other(self.MyModel): pass
+        class Other(self.MyModel): pass  # noqa: E701
         assert self.db.check_registration(Other, True) == 'foo'
 
     def test_check_register_handles_complex_cases(self):
         self.installFlah()
 
-        class Second(Model): pass
+        class Second(Model): pass  # noqa: E701
         self.db.run("CREATE TABLE blum (bar text)")
         self.db.register_model(Second, 'blum')
         assert self.db.check_registration(Second) == 'blum'
 
-        class Third(self.MyModel, Second): pass
+        class Third(self.MyModel, Second): pass  # noqa: E701
         actual = list(sorted(self.db.check_registration(Third, True)))
         assert actual == ['blum', 'flah', 'foo']
 
@@ -424,7 +424,7 @@ class TestORM(WithData):
 
     def test_unregister_leaves_other(self):
         self.db.run("CREATE TABLE flum (bar text)")
-        class OtherModel(Model): pass
+        class OtherModel(Model): pass  # noqa: E701
         self.db.register_model(OtherModel, 'flum')
         self.db.unregister_model(self.MyModel)
         assert self.db.model_registry == {'flum': OtherModel}
@@ -442,7 +442,7 @@ class TestORM(WithData):
     def test_replace_column_different_type(self):
         self.db.run("CREATE TABLE grok (bar int)")
         self.db.run("INSERT INTO grok VALUES (0)")
-        class EmptyModel(Model): pass
+        class EmptyModel(Model): pass  # noqa: E701
         self.db.register_model(EmptyModel, 'grok')
         # Add a new column then drop the original one
         self.db.run("ALTER TABLE grok ADD COLUMN biz text NOT NULL DEFAULT 'x'")
@@ -560,7 +560,7 @@ class TestRowCursorFactory(WithCursorFactory):
         assert r == r
         assert r == (1, 2)
         assert r == {'foo': 1, 'bar': 2}
-        assert r != None
+        assert r != None  # noqa: E711
 
     def test_special_col_names(self):
         r = self.db.one('SELECT 1 as "foo.bar_baz", 2 as "?column?", 3 as "3"')
