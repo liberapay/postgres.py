@@ -148,7 +148,7 @@ class SimpleCursorBase(object):
         else:
             return t
 
-    def run(self, sql, paramaters=None, **kw):
+    def run(self, sql, parameters=None, **kw):
         """Execute a query, without returning any results.
 
         :param str sql: the SQL statement to execute
@@ -169,11 +169,11 @@ class SimpleCursorBase(object):
 
         """
         if kw:
-            if paramaters:
-                paramaters.update(kw)
+            if parameters:
+                parameters.update(kw)
             else:
-                paramaters = kw
-        TupleCursor.execute(self, sql, paramaters)
+                parameters = kw
+        TupleCursor.execute(self, sql, parameters)
 
     def one(self, sql, parameters=None, default=None, back_as=None, **kw):
         """Execute a query and return a single result or a default value.
