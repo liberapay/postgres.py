@@ -20,6 +20,21 @@ itemgetter0 = itemgetter(0)
 # Exceptions
 # ==========
 
+class BadBackAs(Exception):
+
+    def __init__(self, bad_value, back_as_registry):
+        self.bad_value = bad_value
+        self.back_as_registry = back_as_registry
+
+    def __str__(self):
+        available_values = ', '.join(sorted([
+            k for k in self.back_as_registry.keys() if isinstance(k, type(''))
+        ]))
+        return "{!r} is not a valid value for the back_as argument.\n" \
+               "The available values are: {}." \
+               .format(self.bad_value, available_values)
+
+
 class OutOfBounds(Exception):
 
     def __init__(self, n, lo, hi):
@@ -37,8 +52,11 @@ class OutOfBounds(Exception):
             msg += "between {lo} and {hi} (inclusive)."
         return msg.format(**self.__dict__)
 
-class TooFew(OutOfBounds): pass
-class TooMany(OutOfBounds): pass
+class TooFew(OutOfBounds):
+    pass
+
+class TooMany(OutOfBounds):
+    pass
 
 
 # Cursors
@@ -65,11 +83,12 @@ class SimpleCursorBase(object):
     :attr:`cursor_factory` for a :class:`~postgres.Postgres` instance, we
     won't let you:
 
-    >>> db = Postgres(cursor_factory=LoggingCursor)
+    >>> db = Postgres(cursor_factory=LoggingCursor)  # doctest: +NORMALIZE_WHITESPACE
     ...
     Traceback (most recent call last):
         ...
-    postgres.NotASimpleCursor: We can only work with subclasses of postgres.cursors.SimpleCursorBase. LoggingCursor doesn't fit the bill.
+    postgres.NotASimpleCursor: We can only work with subclasses of SimpleCursorBase,
+    LoggingCursor doesn't fit the bill.
 
     However, we do allow you to use whatever you want as the
     :attr:`cursor_factory` argument for individual calls:
@@ -96,7 +115,7 @@ class SimpleCursorBase(object):
             try:
                 back_as = self.connection.back_as_registry[back_as]
             except KeyError:
-                raise BadBackAs(back_as)
+                raise BadBackAs(back_as, self.connection.back_as_registry)
         while True:
             try:
                 t = next(it)
@@ -117,8 +136,8 @@ class SimpleCursorBase(object):
                 try:
                     back_as = self.connection.back_as_registry[back_as]
                 except KeyError:
-                    raise BadBackAs(back_as)
-                return back_as(self.description, out)
+                    raise BadBackAs(back_as, self.connection.back_as_registry)
+                return back_as(self.description, t)
             else:
                 return t
 
@@ -130,10 +149,10 @@ class SimpleCursorBase(object):
             try:
                 back_as = self.connection.back_as_registry[back_as]
             except KeyError:
-                raise BadBackAs(back_as)
+                raise BadBackAs(back_as, self.connection.back_as_registry)
             return [back_as(cols, t) for t in ts]
         else:
-            return t
+            return ts
 
     def fetchall(self, back_as=None):
         ts = TupleCursor.fetchall(self)
@@ -143,10 +162,10 @@ class SimpleCursorBase(object):
             try:
                 back_as = self.connection.back_as_registry[back_as]
             except KeyError:
-                raise BadBackAs(back_as)
+                raise BadBackAs(back_as, self.connection.back_as_registry)
             return [back_as(cols, t) for t in ts]
         else:
-            return t
+            return ts
 
     def run(self, sql, parameters=None, **kw):
         """Execute a query, without returning any results.
@@ -288,7 +307,7 @@ class SimpleCursorBase(object):
                 try:
                     back_as = self.connection.back_as_registry[back_as]
                 except KeyError:
-                    raise BadBackAs(back_as)
+                    raise BadBackAs(back_as, self.connection.back_as_registry)
                 out = back_as(self.description, out)
 
         return out
@@ -350,7 +369,7 @@ class SimpleCursorBase(object):
                     try:
                         back_as = self.connection.back_as_registry[back_as]
                     except KeyError:
-                        raise BadBackAs(back_as)
+                        raise BadBackAs(back_as, self.connection.back_as_registry)
                     recs = [back_as(self.description, r) for r in recs]
         return recs
 
