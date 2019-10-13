@@ -165,21 +165,15 @@ The Postgres Object
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import sys
-if sys.version_info[0] == 2:    # Python 2
-    # "Note: In Python 2, if you want to uniformly receive all your database
-    # input in Unicode, you can register the related typecasters globally as
-    # soon as Psycopg is imported."
-    #   -- http://initd.org/psycopg/docs/usage.html#unicode-handling
-
-    import psycopg2.extensions
-    psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
-    psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
-
 from collections import namedtuple
+from inspect import isclass
+import sys
 
 import psycopg2
-from inspect import isclass
+from psycopg2 import DataError, InterfaceError, ProgrammingError
+from psycopg2.extras import register_composite, CompositeCaster
+from psycopg2_pool import ThreadSafeConnectionPool
+
 from postgres.context_managers import (
     ConnectionContextManager, CursorContextManager, CursorSubcontextManager,
     ConnectionCursorContextManager,
@@ -189,9 +183,15 @@ from postgres.cursors import (
     BadBackAs, Row, SimpleCursorBase, SimpleNamedTupleCursor,
 )
 from postgres.orm import Model
-from psycopg2 import DataError, InterfaceError, ProgrammingError
-from psycopg2.extras import register_composite, CompositeCaster
-from psycopg2_pool import ThreadSafeConnectionPool
+
+
+if sys.version_info[0] == 2:    # Python 2
+    # "Note: In Python 2, if you want to uniformly receive all your database
+    # input in Unicode, you can register the related typecasters globally as
+    # soon as Psycopg is imported."
+    #   -- http://initd.org/psycopg/docs/usage.html#unicode-handling
+    psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
+    psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
 
 __version__ = '2.2.2'
@@ -202,8 +202,8 @@ __version__ = '2.2.2'
 
 class NotASimpleCursor(Exception):
     def __str__(self):
-        return "We can only work with subclasses of postgres.cursors." \
-               "SimpleCursorBase. {} doesn't fit the bill." \
+        return "We can only work with subclasses of SimpleCursorBase, " \
+               "{} doesn't fit the bill." \
                .format(self.args[0].__name__)
 
 class NotAModel(Exception):
@@ -579,7 +579,7 @@ class Postgres(object):
             filt = lambda v: v is ModelSubclass or issubclass(ModelSubclass, v)
         else:
             filt = lambda v: v is ModelSubclass
-        keys = [k for k,v in self.model_registry.items() if filt(v)]
+        keys = [k for k, v in self.model_registry.items() if filt(v)]
         if not keys:
             raise NotRegistered(ModelSubclass)
         if len(keys) == 1:
@@ -589,7 +589,7 @@ class Postgres(object):
         return keys
 
 
-    def _validate_model_subclass(self, ModelSubclass, ):
+    def _validate_model_subclass(self, ModelSubclass):
         if not isclass(ModelSubclass) or not issubclass(ModelSubclass, Model):
             raise NotAModel(ModelSubclass)
 

@@ -9,7 +9,7 @@ class CursorContextManager(object):
     :param pool: see :mod:`psycopg2_pool`
     :param bool autocommit: see :attr:`psycopg2:connection.autocommit`
     :param bool readonly: see :attr:`psycopg2:connection.readonly`
-    :param \**cursor_kwargs: passed to :meth:`psycopg2:connection.cursor`
+    :param cursor_kwargs: passed to :meth:`psycopg2:connection.cursor`
 
     During construction, a connection is checked out of the connection pool
     and its :attr:`autocommit` and :attr:`readonly` attributes are set, then a
@@ -56,7 +56,7 @@ class ConnectionCursorContextManager(object):
     :param conn: a :class:`psycopg2:connection`
     :param bool autocommit: see :attr:`psycopg2:connection.autocommit`
     :param bool readonly: see :attr:`psycopg2:connection.readonly`
-    :param \**cursor_kwargs: passed to :meth:`psycopg2:connection.cursor`
+    :param cursor_kwargs: passed to :meth:`psycopg2:connection.cursor`
 
     During construction, the connection's :attr:`autocommit` and :attr:`readonly`
     attributes are set, then :meth:`psycopg2:connection.cursor` is called with

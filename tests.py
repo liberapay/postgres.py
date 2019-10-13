@@ -1,6 +1,5 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os
 from collections import namedtuple
 import sys
 from unittest import TestCase
@@ -115,38 +114,30 @@ class TestWrongNumberException(WithData):
 class TestOneOrZero(WithData):
 
     def test_one_raises_TooFew(self):
-        self.assertRaises( TooFew
-                         , self.db.one
-                         , "CREATE TABLE foux (baar text)"
-                          )
+        with self.assertRaises(TooFew):
+            self.db.one("CREATE TABLE foux (baar text)")
 
     def test_one_rollsback_on_error(self):
         try:
             self.db.one("CREATE TABLE foux (baar text)")
         except TooFew:
             pass
-        self.assertRaises( ProgrammingError
-                         , self.db.all
-                         , "SELECT * FROM foux"
-                          )
+        with self.assertRaises(ProgrammingError):
+            self.db.all("SELECT * FROM foux")
 
     def test_one_returns_None(self):
         actual = self.db.one("SELECT * FROM foo WHERE bar='blam'")
         assert actual is None
 
     def test_one_returns_default(self):
-        class WHEEEE: pass
-        actual = self.db.one( "SELECT * FROM foo WHERE bar='blam'"
-                            , default=WHEEEE
-                             )
+        class WHEEEE: pass  # noqa: E701
+        actual = self.db.one("SELECT * FROM foo WHERE bar='blam'", default=WHEEEE)
         assert actual is WHEEEE
 
     def test_one_raises_default(self):
         exception = RuntimeError('oops')
         try:
-            actual = self.db.one( "SELECT * FROM foo WHERE bar='blam'"
-                                , default=exception
-                                 )
+            self.db.one("SELECT * FROM foo WHERE bar='blam'", default=exception)
         except Exception as e:
             if e is not exception:
                 raise
@@ -228,9 +219,8 @@ class TestCursor(WithData):
     def test_we_close_the_cursor(self):
         with self.db.get_cursor() as cursor:
             cursor.execute("SELECT * FROM foo ORDER BY bar")
-        self.assertRaises( InterfaceError
-                         , cursor.fetchall
-                          )
+        with self.assertRaises(InterfaceError):
+            cursor.fetchall()
 
     def test_monkey_patch_execute(self):
         expected = "SELECT 1"
@@ -284,6 +274,7 @@ class TestCursor(WithData):
             with self.db.get_cursor() as cursor:
                 cursor.execute("INSERT INTO foo VALUES ('lorem')")
                 with self.db.get_cursor(cursor=cursor) as c:
+                    c.execute("INSERT INTO foo VALUES ('ipsum')")
                     raise Heck
         except Heck:
             pass
@@ -340,9 +331,7 @@ class TestORM(WithData):
             self.bar_from_init = record['bar']
 
         def update_bar(self, bar):
-            self.db.run( "UPDATE foo SET bar=%s WHERE bar=%s"
-                       , (bar, self.bar)
-                        )
+            self.db.run("UPDATE foo SET bar=%s WHERE bar=%s", (bar, self.bar))
             self.set_attributes(bar=bar)
 
     def setUp(self):

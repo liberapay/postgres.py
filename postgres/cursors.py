@@ -52,8 +52,11 @@ class OutOfBounds(Exception):
             msg += "between {lo} and {hi} (inclusive)."
         return msg.format(**self.__dict__)
 
-class TooFew(OutOfBounds): pass
-class TooMany(OutOfBounds): pass
+class TooFew(OutOfBounds):
+    pass
+
+class TooMany(OutOfBounds):
+    pass
 
 
 # Cursors
@@ -80,11 +83,12 @@ class SimpleCursorBase(object):
     :attr:`cursor_factory` for a :class:`~postgres.Postgres` instance, we
     won't let you:
 
-    >>> db = Postgres(cursor_factory=LoggingCursor)
+    >>> db = Postgres(cursor_factory=LoggingCursor)  # doctest: +NORMALIZE_WHITESPACE
     ...
     Traceback (most recent call last):
         ...
-    postgres.NotASimpleCursor: We can only work with subclasses of postgres.cursors.SimpleCursorBase. LoggingCursor doesn't fit the bill.
+    postgres.NotASimpleCursor: We can only work with subclasses of SimpleCursorBase,
+    LoggingCursor doesn't fit the bill.
 
     However, we do allow you to use whatever you want as the
     :attr:`cursor_factory` argument for individual calls:
