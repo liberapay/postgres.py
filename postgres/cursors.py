@@ -12,6 +12,8 @@ from operator import itemgetter
 from psycopg2.extensions import cursor as TupleCursor
 from psycopg2.extras import NamedTupleCursor
 
+from postgres.cache import CacheEntry
+
 
 itemgetter0 = itemgetter(0)
 
@@ -166,6 +168,14 @@ class SimpleCursorBase:
         else:
             return ts
 
+    def mogrify(self, sql, parameters, **kw):
+        if kw:
+            if parameters:
+                parameters.update(kw)
+            else:
+                parameters = kw
+        return TupleCursor.mogrify(self, sql, parameters)
+
     def run(self, sql, parameters=None, **kw):
         """Execute a query, without returning any results.
 
@@ -193,7 +203,7 @@ class SimpleCursorBase:
                 parameters = kw
         TupleCursor.execute(self, sql, parameters)
 
-    def one(self, sql, parameters=None, default=None, back_as=None, **kw):
+    def one(self, sql, parameters=None, default=None, back_as=None, max_age=None, **kw):
         """Execute a query and return a single result or a default value.
 
         :param str sql: the SQL statement to execute
@@ -202,6 +212,7 @@ class SimpleCursorBase:
         :param default: the value to return or raise if no results are found
         :param back_as: the type of record to return
         :type back_as: type or string
+        :param float max_age: how long to keep the result in the cache (in seconds)
         :param kw: alternative to passing a :class:`dict` as `parameters`
 
         :returns: a single record or value, or :attr:`default` (if
@@ -278,23 +289,34 @@ class SimpleCursorBase:
         {'foo': None}
 
         """
+        query = self.mogrify(sql, parameters, **kw)
+        if max_age:
+            entry = self._cached_fetchall(query, max_age)
+            columns = entry.columns
+            rowcount = len(entry.rows)
+            if rowcount == 1:
+                row_tuple = entry.rows[0]
+        else:
+            self.run(query)
+            columns = self.description
+            rowcount = self.rowcount
+            if rowcount == 1:
+                row_tuple = TupleCursor.fetchone(self)
 
-        # fetch
-        self.run(sql, parameters, **kw)
-        if self.rowcount == 1:
-            out = TupleCursor.fetchone(self)
-        elif self.rowcount == 0:
+        if rowcount == 1:
+            pass
+        elif rowcount == 0:
             if isexception(default):
                 raise default
             return default
-        elif self.rowcount < 0:
-            raise TooFew(self.rowcount, 0, 1)
+        elif rowcount < 0:
+            raise TooFew(rowcount, 0, 1)
         else:
-            raise TooMany(self.rowcount, 0, 1)
+            raise TooMany(rowcount, 0, 1)
 
-        if len(out) == 1 and back_as is None:
+        if len(row_tuple) == 1 and back_as is None:
             # dereference
-            out = out[0]
+            out = row_tuple[0]
             if out is None:
                 if isexception(default):
                     raise default
@@ -307,11 +329,13 @@ class SimpleCursorBase:
                     back_as = self.connection.back_as_registry[back_as]
                 except KeyError:
                     raise BadBackAs(back_as, self.connection.back_as_registry)
-                out = back_as(self.description, out)
+                out = back_as(columns, row_tuple)
+            else:
+                out = row_tuple
 
         return out
 
-    def all(self, sql, parameters=None, back_as=None, **kw):
+    def all(self, sql, parameters=None, back_as=None, max_age=None, **kw):
         """Execute a query and return all results.
 
         :param str sql: the SQL statement to execute
@@ -319,6 +343,7 @@ class SimpleCursorBase:
         :type parameters: dict or tuple
         :param back_as: the type of record to return
         :type back_as: type or string
+        :param float max_age: how long to keep the results in the cache (in seconds)
         :param kw: alternative to passing a :class:`dict` as `parameters`
 
         :returns: :class:`list` of records or :class:`list` of single values
@@ -355,8 +380,14 @@ class SimpleCursorBase:
         [{'baz': 537}, {'baz': 42}]
 
         """
-        self.run(sql, parameters, **kw)
-        recs = TupleCursor.fetchall(self)
+        query = self.mogrify(sql, parameters, **kw)
+        if max_age:
+            entry = self._cached_fetchall(query, max_age)
+            columns, recs = entry.columns, entry.rows
+        else:
+            self.run(query)
+            recs = TupleCursor.fetchall(self)
+            columns = self.description
         if recs:
             if len(recs[0]) == 1 and back_as is None:
                 # dereference
@@ -369,8 +400,28 @@ class SimpleCursorBase:
                         back_as = self.connection.back_as_registry[back_as]
                     except KeyError:
                         raise BadBackAs(back_as, self.connection.back_as_registry)
-                    recs = [back_as(self.description, r) for r in recs]
+                    recs = [back_as(columns, r) for r in recs]
+                elif max_age:
+                    recs = recs.copy()
         return recs
+
+    def _cached_fetchall(self, query, max_age):
+        cache = self.connection.postgres.cache
+        entry = cache.lookup(query, max_age)
+        if entry:
+            return entry
+        with cache.get_lock(query):
+            # Check that an entry hasn't been inserted after our first lookup
+            # but before we obtained the lock.
+            entry = cache.lookup(query, max_age)
+            if entry:
+                return entry
+            # Okay, send the query to the database and cache the result.
+            self.run(query)
+            rows = TupleCursor.fetchall(self)
+            entry = CacheEntry(query, max_age, self.description, rows)
+            cache[query] = entry
+            return entry
 
 
 def make_dict(cols, vals):
