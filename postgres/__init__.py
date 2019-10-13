@@ -548,9 +548,6 @@ class Postgres(object):
 
         """
         keys = self.check_registration(ModelSubclass)
-        if not isinstance(keys, list):
-            # Wrap single string in a list. Flip-side of XXX just below.
-            keys = [keys]
         for key in keys:
             del self.model_registry[key]
 
@@ -564,13 +561,10 @@ class Postgres(object):
             of :class:`ModelSubclass` or just :class:`ModelSubclass`
             itself
 
-        :returns: the :attr:`typname` (a string) for which this model is
-            registered, or a list of strings if it's registered for multiple
-            types
+        :returns: the type names (:attr:`typname`) for which this model is registered
+        :rtype: list
 
-        :rettype: string
-        :raises: :exc:`~postgres.NotAModel`,
-            :exc:`~postgres.NotRegistered`
+        :raises: :exc:`.NotAModel`, :exc:`.NotRegistered`
 
         """
         self._validate_model_subclass(ModelSubclass)
@@ -582,10 +576,6 @@ class Postgres(object):
         keys = [k for k, v in self.model_registry.items() if filt(v)]
         if not keys:
             raise NotRegistered(ModelSubclass)
-        if len(keys) == 1:
-            # Dereference a single-item list, for backwards-compatibility.
-            # XXX If/when we go to 3.0, lose this cruft (always return list).
-            keys = keys[0]
         return keys
 
 
