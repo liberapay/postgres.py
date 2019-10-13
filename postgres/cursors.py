@@ -28,7 +28,7 @@ class BadBackAs(Exception):
 
     def __str__(self):
         available_values = ', '.join(sorted([
-            k for k in self.back_as_registry.keys() if type(k) is str
+            k for k in self.back_as_registry.keys() if isinstance(k, type(''))
         ]))
         return "{!r} is not a valid value for the back_as argument.\n" \
                "The available values are: {}." \

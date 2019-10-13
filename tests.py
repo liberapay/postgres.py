@@ -104,9 +104,9 @@ class TestRows(WithData):
         with self.assertRaises(BadBackAs) as context:
             self.db.all("SELECT * FROM foo", back_as='foo')
         assert str(context.exception) == (
-            "'foo' is not a valid value for the back_as argument.\n"
+            "%r is not a valid value for the back_as argument.\n"
             "The available values are: Row, dict, namedtuple, tuple."
-        )
+        ) % 'foo'
 
 
 # db.one
@@ -205,9 +205,9 @@ class TestOne(WithData):
         with self.assertRaises(BadBackAs) as context:
             self.db.one("SELECT * FROM foo LIMIT 1", back_as='foo')
         assert str(context.exception) == (
-            "'foo' is not a valid value for the back_as argument.\n"
+            "%r is not a valid value for the back_as argument.\n"
             "The available values are: Row, dict, namedtuple, tuple."
-        )
+        ) % 'foo'
 
 
 # db.get_cursor
@@ -526,9 +526,9 @@ class TestSimpleCursorBase(WithData):
             with self.assertRaises(BadBackAs) as context:
                 cursor.fetchone(back_as='bar')
             assert str(context.exception) == (
-                "'bar' is not a valid value for the back_as argument.\n"
+                "%r is not a valid value for the back_as argument.\n"
                 "The available values are: Row, dict, namedtuple, tuple."
-            )
+            ) % 'bar'
 
     def test_fetchmany(self):
         with self.db.get_cursor(cursor_factory=SimpleTupleCursor) as cursor:
@@ -551,9 +551,9 @@ class TestSimpleCursorBase(WithData):
             with self.assertRaises(BadBackAs) as context:
                 cursor.fetchmany(back_as='bar')
             assert str(context.exception) == (
-                "'bar' is not a valid value for the back_as argument.\n"
+                "%r is not a valid value for the back_as argument.\n"
                 "The available values are: Row, dict, namedtuple, tuple."
-            )
+            ) % 'bar'
 
     def test_fetchall(self):
         with self.db.get_cursor(cursor_factory=SimpleTupleCursor) as cursor:
@@ -576,9 +576,9 @@ class TestSimpleCursorBase(WithData):
             with self.assertRaises(BadBackAs) as context:
                 cursor.fetchall(back_as='bar')
             assert str(context.exception) == (
-                "'bar' is not a valid value for the back_as argument.\n"
+                "%r is not a valid value for the back_as argument.\n"
                 "The available values are: Row, dict, namedtuple, tuple."
-            )
+            ) % 'bar'
 
 
 # cursor_factory
