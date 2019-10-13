@@ -186,7 +186,7 @@ from postgres.context_managers import (
 )
 from postgres.cursors import (
     make_dict, make_namedtuple, return_tuple_as_is,
-    Row, SimpleCursorBase, SimpleNamedTupleCursor,
+    BadBackAs, Row, SimpleCursorBase, SimpleNamedTupleCursor,
 )
 from postgres.orm import Model
 from psycopg2 import DataError, InterfaceError, ProgrammingError
@@ -231,12 +231,6 @@ class AlreadyRegistered(Exception):
 class NotRegistered(Exception):
     def __str__(self):
         return "The model {} is not registered.".format(self.args[0].__name__)
-
-class BadBackAs(Exception):
-    def __str__(self):
-        return "Bad back_as: {}. Available back_as values are: tuple, " \
-               "namedtuple, dict, or None (to use the default)." \
-               .format(self.args[0])
 
 
 # The Main Event
@@ -653,7 +647,7 @@ def make_Connection(postgres):
             cursor = super(Connection, self).cursor(**kw)
             if back_as is not None:
                 if back_as not in self.back_as_registry:
-                    raise BadBackAs(back_as)
+                    raise BadBackAs(back_as, self.back_as_registry)
                 cursor.back_as = back_as
             return cursor
 
