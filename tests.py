@@ -7,7 +7,7 @@ from unittest import TestCase
 from postgres import Postgres, NotAModel, NotRegistered, NoSuchType, NoTypeSpecified
 from postgres.cursors import (
     BadBackAs, TooFew, TooMany,
-    Row, SimpleDictCursor, SimpleNamedTupleCursor, SimpleRowCursor,
+    Row, SimpleDictCursor, SimpleNamedTupleCursor, SimpleRowCursor, SimpleTupleCursor,
 )
 from postgres.orm import ReadOnly, Model
 from psycopg2.errors import InterfaceError, ProgrammingError, ReadOnlySqlTransaction
@@ -59,6 +59,12 @@ class TestRun(WithSchema):
         actual = self.db.one("SELECT * FROM foo ORDER BY bar")
         assert actual == "baz"
 
+    def test_run_accepts_bind_parameters_as_keyword_arguments(self):
+        self.db.run("CREATE TABLE foo (bar text)")
+        self.db.run("INSERT INTO foo VALUES (%(bar)s)", bar='baz')
+        actual = self.db.one("SELECT * FROM foo ORDER BY bar")
+        assert actual == "baz"
+
 
 # db.all
 # ======
@@ -88,6 +94,10 @@ class TestRows(WithData):
 
     def test_bind_parameters_as_tuple_work(self):
         actual = self.db.all("SELECT * FROM foo WHERE bar=%s", ("baz",))
+        assert actual == ["baz"]
+
+    def test_bind_parameters_as_kwargs_work(self):
+        actual = self.db.all("SELECT * FROM foo WHERE bar=%(bar)s", bar='baz')
         assert actual == ["baz"]
 
     def test_all_raises_BadBackAs(self):
@@ -120,7 +130,7 @@ class TestWrongNumberException(WithData):
         assert actual == "Got 4 rows; expecting between 1 and 3 (inclusive)."
 
 
-class TestOneOrZero(WithData):
+class TestOne(WithData):
 
     def test_one_raises_TooFew(self):
         with self.assertRaises(TooFew):
@@ -172,11 +182,23 @@ class TestOneOrZero(WithData):
         actual = self.db.one("SELECT * FROM foo WHERE bar='baz'")
         assert actual == "baz"
 
+    def test_one_accepts_a_dict_for_bind_parameters(self):
+        actual = self.db.one("SELECT %(bar)s as bar", {"bar": "baz"})
+        assert actual == "baz"
+
+    def test_one_accepts_a_tuple_for_bind_parameters(self):
+        actual = self.db.one("SELECT %s as bar", ("baz",))
+        assert actual == "baz"
+
+    def test_one_accepts_bind_parameters_as_keyword_arguments(self):
+        actual = self.db.one("SELECT %(bar)s as bar", bar='baz')
+        assert actual == "baz"
+
     def test_one_doesnt_choke_on_values_column(self):
         actual = self.db.one("SELECT 1 AS values")
         assert actual == 1
 
-    def test_with_strict_True_one_raises_TooMany(self):
+    def test_one_raises_TooMany(self):
         self.assertRaises(TooMany, self.db.one, "SELECT * FROM foo")
 
     def test_one_raises_BadBackAs(self):
@@ -476,6 +498,87 @@ class TestORM(WithData):
         one = self.db.one("SELECT foo.*::foo FROM foo LIMIT 1")
         assert one.biz == 0
         assert not hasattr(one, 'bar')
+
+
+# SimpleCursorBase
+# ================
+
+class TestSimpleCursorBase(WithData):
+
+    def test_fetchone(self):
+        with self.db.get_cursor(cursor_factory=SimpleTupleCursor) as cursor:
+            cursor.execute("SELECT 1 as foo")
+            r = cursor.fetchone()
+            assert r == (1,)
+
+    def test_fetchone_supports_back_as(self):
+        with self.db.get_cursor() as cursor:
+            cursor.execute("SELECT 1 as foo")
+            r = cursor.fetchone(back_as=dict)
+            assert r == {'foo': 1}
+            cursor.execute("SELECT 2 as foo")
+            r = cursor.fetchone(back_as=tuple)
+            assert r == (2,)
+
+    def test_fetchone_raises_BadBackAs(self):
+        with self.db.get_cursor() as cursor:
+            cursor.execute("SELECT 1 as foo")
+            with self.assertRaises(BadBackAs) as context:
+                cursor.fetchone(back_as='bar')
+            assert str(context.exception) == (
+                "'bar' is not a valid value for the back_as argument.\n"
+                "The available values are: Row, dict, namedtuple, tuple."
+            )
+
+    def test_fetchmany(self):
+        with self.db.get_cursor(cursor_factory=SimpleTupleCursor) as cursor:
+            cursor.execute("SELECT 1 as foo")
+            r = cursor.fetchmany()
+            assert r == [(1,)]
+
+    def test_fetchmany_supports_back_as(self):
+        with self.db.get_cursor() as cursor:
+            cursor.execute("SELECT 1 as foo")
+            r = cursor.fetchmany(back_as=dict)
+            assert r == [{'foo': 1}]
+            cursor.execute("SELECT 2 as foo")
+            r = cursor.fetchmany(back_as=tuple)
+            assert r == [(2,)]
+
+    def test_fetchmany_raises_BadBackAs(self):
+        with self.db.get_cursor() as cursor:
+            cursor.execute("SELECT 1 as foo")
+            with self.assertRaises(BadBackAs) as context:
+                cursor.fetchmany(back_as='bar')
+            assert str(context.exception) == (
+                "'bar' is not a valid value for the back_as argument.\n"
+                "The available values are: Row, dict, namedtuple, tuple."
+            )
+
+    def test_fetchall(self):
+        with self.db.get_cursor(cursor_factory=SimpleTupleCursor) as cursor:
+            cursor.execute("SELECT 1 as foo")
+            r = cursor.fetchall()
+            assert r == [(1,)]
+
+    def test_fetchall_supports_back_as(self):
+        with self.db.get_cursor() as cursor:
+            cursor.execute("SELECT 1 as foo")
+            r = cursor.fetchall(back_as=dict)
+            assert r == [{'foo': 1}]
+            cursor.execute("SELECT 2 as foo")
+            r = cursor.fetchall(back_as=tuple)
+            assert r == [(2,)]
+
+    def test_fetchall_raises_BadBackAs(self):
+        with self.db.get_cursor() as cursor:
+            cursor.execute("SELECT 1 as foo")
+            with self.assertRaises(BadBackAs) as context:
+                cursor.fetchall(back_as='bar')
+            assert str(context.exception) == (
+                "'bar' is not a valid value for the back_as argument.\n"
+                "The available values are: Row, dict, namedtuple, tuple."
+            )
 
 
 # cursor_factory
