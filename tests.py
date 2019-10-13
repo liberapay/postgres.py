@@ -6,7 +6,8 @@ from unittest import TestCase
 
 from postgres import Postgres, NotAModel, NotRegistered, NoSuchType, NoTypeSpecified
 from postgres.cursors import (
-    TooFew, TooMany, Row, SimpleDictCursor, SimpleNamedTupleCursor, SimpleRowCursor,
+    BadBackAs, TooFew, TooMany,
+    Row, SimpleDictCursor, SimpleNamedTupleCursor, SimpleRowCursor,
 )
 from postgres.orm import ReadOnly, Model
 from psycopg2.errors import InterfaceError, ProgrammingError, ReadOnlySqlTransaction
@@ -89,6 +90,14 @@ class TestRows(WithData):
         actual = self.db.all("SELECT * FROM foo WHERE bar=%s", ("baz",))
         assert actual == ["baz"]
 
+    def test_all_raises_BadBackAs(self):
+        with self.assertRaises(BadBackAs) as context:
+            self.db.all("SELECT * FROM foo", back_as='foo')
+        assert str(context.exception) == (
+            "'foo' is not a valid value for the back_as argument.\n"
+            "The available values are: Row, dict, namedtuple, tuple."
+        )
+
 
 # db.one
 # ======
@@ -169,6 +178,14 @@ class TestOneOrZero(WithData):
 
     def test_with_strict_True_one_raises_TooMany(self):
         self.assertRaises(TooMany, self.db.one, "SELECT * FROM foo")
+
+    def test_one_raises_BadBackAs(self):
+        with self.assertRaises(BadBackAs) as context:
+            self.db.one("SELECT * FROM foo LIMIT 1", back_as='foo')
+        assert str(context.exception) == (
+            "'foo' is not a valid value for the back_as argument.\n"
+            "The available values are: Row, dict, namedtuple, tuple."
+        )
 
 
 # db.get_cursor
