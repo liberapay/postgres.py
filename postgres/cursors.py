@@ -133,7 +133,7 @@ class SimpleCursorBase(object):
                     back_as = self.connection.back_as_registry[back_as]
                 except KeyError:
                     raise BadBackAs(back_as, self.connection.back_as_registry)
-                return back_as(self.description, out)
+                return back_as(self.description, t)
             else:
                 return t
 
@@ -148,7 +148,7 @@ class SimpleCursorBase(object):
                 raise BadBackAs(back_as, self.connection.back_as_registry)
             return [back_as(cols, t) for t in ts]
         else:
-            return t
+            return ts
 
     def fetchall(self, back_as=None):
         ts = TupleCursor.fetchall(self)
@@ -161,7 +161,7 @@ class SimpleCursorBase(object):
                 raise BadBackAs(back_as, self.connection.back_as_registry)
             return [back_as(cols, t) for t in ts]
         else:
-            return t
+            return ts
 
     def run(self, sql, parameters=None, **kw):
         """Execute a query, without returning any results.
