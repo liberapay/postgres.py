@@ -204,8 +204,6 @@ class NotRegistered(Exception):
 class Model(object):
     """This is the base class for models in :mod:`postgres.orm`.
 
-    :param dict record: The raw query result
-
     Instances of subclasses of :class:`~postgres.orm.Model` will have an
     attribute for each field in the composite type for which the subclass is
     registered (for table and view types, these will be the columns of the
@@ -219,12 +217,12 @@ class Model(object):
     typname = None                          # an entry in pg_type
     db = None                               # will be set to a Postgres object
 
-    def __init__(self, record):
+    def __init__(self, colnames, values):
         if self.db is None:
             raise NotBound(self)
         self.db.check_registration(self.__class__, include_subsubclasses=True)
-        self.__read_only_attributes = record.keys()
-        self.__dict__.update(**record)
+        self.__read_only_attributes = set(colnames)
+        self.__dict__.update(zip(colnames, values))
 
     def __setattr__(self, name, value):
         if name in self.__read_only_attributes:

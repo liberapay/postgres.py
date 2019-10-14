@@ -693,8 +693,7 @@ def make_DelegatingCaster(postgres):
                 raise NotImplementedError
 
             ModelSubclass = postgres.model_registry[self.name]
-            record = dict(zip(self.attnames, values))
-            instance = ModelSubclass(record)
+            instance = ModelSubclass(self.attnames, values)
             return instance
 
         def _refetch_type_info(self, curs):
