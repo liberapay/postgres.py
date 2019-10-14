@@ -4,12 +4,15 @@ from collections import namedtuple
 import sys
 from unittest import TestCase
 
-from postgres import Postgres, NotAModel, NotRegistered, NoSuchType, NoTypeSpecified
+from postgres import (
+    AlreadyRegistered, NotAModel, NotRegistered, NoSuchType, NoTypeSpecified,
+    Postgres,
+)
 from postgres.cursors import (
     BadBackAs, TooFew, TooMany,
     Row, SimpleDictCursor, SimpleNamedTupleCursor, SimpleRowCursor, SimpleTupleCursor,
 )
-from postgres.orm import ReadOnly, Model
+from postgres.orm import Model, ReadOnly, UnknownAttributes
 from psycopg2.errors import InterfaceError, ProgrammingError, ReadOnlySqlTransaction
 from pytest import mark, raises
 
@@ -392,6 +395,14 @@ class TestORM(WithData):
         self.db.run("CREATE TABLE foo.flah (bar text)")
         self.db.register_model(self.MyModel, 'foo.flah')
 
+    def test_register_model_raises_AlreadyRegistered(self):
+        with self.assertRaises(AlreadyRegistered) as context:
+            self.db.register_model(self.MyModel)
+        assert context.exception.args == (self.MyModel, self.MyModel.typname)
+        assert str(context.exception) == (
+            "The model MyModel is already registered for the typname foo."
+        )
+
     def test_register_model_raises_NoSuchType(self):
         with self.assertRaises(NoSuchType):
             self.db.register_model(self.MyModel, 'nonexistent')
@@ -414,10 +425,21 @@ class TestORM(WithData):
         bar = self.db.one("SELECT bar FROM foo WHERE bar='blah'")
         assert bar == one.bar
 
+    def test_setting_unknown_attributes(self):
+        one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
+        with self.assertRaises(UnknownAttributes) as context:
+            one.set_attributes(bar='blah', x=0, y=1)
+        assert sorted(context.exception.args[0]) == ['x', 'y']
+        assert str(context.exception) == (
+            "The following attribute(s) are unknown to us: %s."
+        ) % ', '.join(context.exception.args[0])
+
     def test_attributes_are_read_only(self):
         one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
-        with self.assertRaises(ReadOnly):
+        with self.assertRaises(ReadOnly) as context:
             one.bar = "blah"
+        assert context.exception.args == ("bar",)
+        assert str(context.exception).startswith("bar is a read-only attribute.")
 
     def test_check_register_raises_if_passed_a_model_instance(self):
         obj = self.MyModel(['baz'])
