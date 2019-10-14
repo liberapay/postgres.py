@@ -428,7 +428,7 @@ class TestORM(WithData):
 
     def test_dot_dot_dot_unless_you_ask_it_to(self):
         class Other(self.MyModel): pass  # noqa: E701
-        assert self.db.check_registration(Other, True) == 'foo'
+        assert self.db.check_registration(Other, True) == ['foo']
 
     def test_check_register_handles_complex_cases(self):
         self.installFlah()
@@ -436,7 +436,7 @@ class TestORM(WithData):
         class Second(Model): pass  # noqa: E701
         self.db.run("CREATE TABLE blum (bar text)")
         self.db.register_model(Second, 'blum')
-        assert self.db.check_registration(Second) == 'blum'
+        assert self.db.check_registration(Second) == ['blum']
 
         class Third(self.MyModel, Second): pass  # noqa: E701
         actual = list(sorted(self.db.check_registration(Third, True)))
@@ -450,7 +450,7 @@ class TestORM(WithData):
         assert flah.bar == "double"
 
     def test_check_register_returns_string_for_single(self):
-        assert self.db.check_registration(self.MyModel) == 'foo'
+        assert self.db.check_registration(self.MyModel) == ['foo']
 
     def test_check_register_returns_list_for_multiple(self):
         self.installFlah()
