@@ -684,15 +684,13 @@ def make_DelegatingCaster(postgres):
 
         def make(self, values):
             # Override to delegate to the model registry.
-            if self.name not in postgres.model_registry:
-
+            try:
+                ModelSubclass = postgres.model_registry[self.name]
+            except KeyError:
                 # This is probably a bug, not a normal user error. It means
                 # we've called register_composite for this typname without also
                 # registering with model_registry.
-
-                raise NotImplementedError
-
-            ModelSubclass = postgres.model_registry[self.name]
+                raise RuntimeError("%r isn't in model_registry" % self.name)
             instance = ModelSubclass(self.attnames, values)
             return instance
 
