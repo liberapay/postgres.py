@@ -204,12 +204,18 @@ class Model(object):
 
     """
 
+    __slots__ = ()
+
     typname = None                          # an entry in pg_type
     db = None                               # will be set to a Postgres object
     _read_only_attributes = None            # set in ModelCaster._from_db()
 
     def __init__(self, values):
-        self.__dict__.update(zip(self._read_only_attributes, values))
+        if getattr(self, '__slots__', None):
+            for name, value in zip(self._read_only_attributes, values):
+                super(Model, self).__setattr__(name, value)
+        else:
+            self.__dict__.update(zip(self._read_only_attributes, values))
 
     def __setattr__(self, name, value):
         if name in self._read_only_attributes:
@@ -238,7 +244,8 @@ class Model(object):
                     unknown.append(name)
         if unknown:
             raise UnknownAttributes(unknown)
-        self.__dict__.update(**kw)
+        for name, value in kw.items():
+            super(Model, self).__setattr__(name, value)
 
 
 if __name__ == '__main__':
