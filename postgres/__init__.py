@@ -165,13 +165,14 @@ The Postgres Object
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from collections import namedtuple
+from collections import OrderedDict, namedtuple
 from inspect import isclass
 import sys
 
 import psycopg2
 from psycopg2 import DataError, InterfaceError, ProgrammingError
-from psycopg2.extras import register_composite, CompositeCaster
+from psycopg2.extensions import register_type
+from psycopg2.extras import CompositeCaster
 from psycopg2_pool import ThreadSafeConnectionPool
 
 from postgres.context_managers import (
@@ -336,7 +337,6 @@ class Postgres(object):
         # ===================
 
         self.model_registry = {}
-        self.DelegatingCaster = make_DelegatingCaster(self)
 
 
     def run(self, sql, parameters=None, **kw):
@@ -519,20 +519,12 @@ class Postgres(object):
             raise AlreadyRegistered(existing_model, typname)
 
         # register a composite
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            name = typname
-            if sys.version_info[0] < 3:
-                name = name.encode('UTF-8')
-            try:
-                register_composite(
-                    name, cursor, globally=True, factory=self.DelegatingCaster
-                )
-            except ProgrammingError:
-                raise NoSuchType(typname)
+        caster = ModelCaster._from_db(self, typname, ModelSubclass)
+        register_type(caster.typecaster)
+        if caster.array_typecaster is not None:
+            register_type(caster.array_typecaster)
 
         self.model_registry[typname] = ModelSubclass
-        ModelSubclass.db = self
 
 
     def unregister_model(self, ModelSubclass):
@@ -653,58 +645,52 @@ def make_Connection(postgres):
     return Connection
 
 
-def make_DelegatingCaster(postgres):
-    """Define a :class:`~psycopg2.extras.CompositeCaster` subclass that
-        delegates to :attr:`~postgres.Postgres.model_registry`.
-
-    :param postgres: the :class:`~postgres.Postgres` instance to bind to
-    :returns: a :class:`DelegatingCaster` class
-
-    The class we return will use the :attr:`model_registry` of the given
-    :class:`~postgres.Postgres` instance to look up a
-    :class:`~postgres.orm.Model` subclass to use in mapping
-    :mod:`psycopg2` return values to higher-order Python objects. Yeah, it's
-    a little squirrelly. :-/
-
+class ModelCaster(CompositeCaster):
+    """A :class:`~psycopg2.extras.CompositeCaster` subclass for :class:`.Model`.
     """
-    class DelegatingCaster(CompositeCaster):
 
-        def parse(self, s, curs, retry=True):
-            # Override to protect against race conditions:
-            #   https://github.com/chadwhitacre/postgres.py/issues/26
-
+    @classmethod
+    def _from_db(cls, db, typname, ModelSubclass):
+        # Override to set custom attributes.
+        with db.get_cursor(autocommit=True, readonly=True) as cursor:
+            name = typname
+            if sys.version_info[0] < 3:
+                name = name.encode('UTF-8')
             try:
-                return super(DelegatingCaster, self).parse(s, curs)
-            except (DataError, ValueError):
-                if not retry:
-                    raise
-                # Re-fetch the type info and retry once
-                self._refetch_type_info(curs)
-                return self.parse(s, curs, False)
+                caster = super(ModelCaster, cls)._from_db(name, cursor)
+            except ProgrammingError:
+                raise NoSuchType(typname)
+        caster.db = ModelSubclass.db = db
+        caster.ModelSubclass = ModelSubclass
+        ModelSubclass._read_only_attributes = OrderedDict.fromkeys(caster.attnames)
+        return caster
 
-        def make(self, values):
-            # Override to delegate to the model registry.
-            try:
-                ModelSubclass = postgres.model_registry[self.name]
-            except KeyError:
-                # This is probably a bug, not a normal user error. It means
-                # we've called register_composite for this typname without also
-                # registering with model_registry.
-                raise RuntimeError("%r isn't in model_registry" % self.name)
-            instance = ModelSubclass(self.attnames, values)
-            return instance
+    def parse(self, s, curs, retry=True):
+        # Override to protect against some race conditions:
+        #   https://github.com/chadwhitacre/postgres.py/issues/26
+        try:
+            return super(ModelCaster, self).parse(s, curs)
+        except (DataError, ValueError):
+            if not retry:
+                raise
+            # Re-fetch the type info and retry once
+            self._refetch_type_info(curs)
+            return self.parse(s, curs, False)
 
-        def _create_type(self):
-            # Override to avoid creation of unused namedtuple class
-            pass
+    def make(self, values):
+        """"""
+        # Override to use ModelSubclass instead of a namedtuple class.
+        return self.ModelSubclass(values)
 
-        def _refetch_type_info(self, curs):
-            """Given a cursor, update the current object with a fresh type definition.
-            """
-            new_self = self._from_db(self.name, curs)
-            self.__dict__.update(new_self.__dict__)
+    def _create_type(self, name, attnames):
+        # Override to avoid the creation of an unwanted namedtuple class.
+        pass
 
-    return DelegatingCaster
+    def _refetch_type_info(self, curs):
+        """Given a cursor, update the current object with a fresh type definition.
+        """
+        new_self = self._from_db(self.db, self.name, self.ModelSubclass)
+        self.__dict__.update(new_self.__dict__)
 
 
 if __name__ == '__main__':

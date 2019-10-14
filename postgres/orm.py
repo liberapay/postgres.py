@@ -216,16 +216,16 @@ class Model(object):
 
     typname = None                          # an entry in pg_type
     db = None                               # will be set to a Postgres object
+    _read_only_attributes = None            # set in ModelCaster._from_db()
 
-    def __init__(self, colnames, values):
+    def __init__(self, values):
         if self.db is None:
             raise NotBound(self)
         self.db.check_registration(self.__class__, include_subsubclasses=True)
-        self.__read_only_attributes = set(colnames)
-        self.__dict__.update(zip(colnames, values))
+        self.__dict__.update(zip(self._read_only_attributes, values))
 
     def __setattr__(self, name, value):
-        if name in self.__read_only_attributes:
+        if name in self._read_only_attributes:
             raise ReadOnly(name)
         return super(Model, self).__setattr__(name, value)
 
@@ -244,7 +244,7 @@ class Model(object):
         """
         unknown = None
         for name in kw:
-            if name not in self.__read_only_attributes:
+            if name not in self._read_only_attributes:
                 if unknown is None:
                     unknown = [name]
                 else:

@@ -365,9 +365,9 @@ class TestORM(WithData):
 
         typname = "foo"
 
-        def __init__(self, record):
-            Model.__init__(self, record)
-            self.bar_from_init = record['bar']
+        def __init__(self, values):
+            Model.__init__(self, values)
+            self.bar_from_init = self.bar
 
         def update_bar(self, bar):
             self.db.run("UPDATE foo SET bar=%s WHERE bar=%s", (bar, self.bar))
@@ -419,7 +419,7 @@ class TestORM(WithData):
         self.assertRaises(ReadOnly, assign)
 
     def test_check_register_raises_if_passed_a_model_instance(self):
-        obj = self.MyModel({'bar': 'baz'})
+        obj = self.MyModel(['baz'])
         raises(NotAModel, self.db.check_registration, obj)
 
     def test_check_register_doesnt_include_subsubclasses(self):
