@@ -13,8 +13,8 @@ database usage.
 .. _Django's ORM: http://www.djangobook.com/en/2.0/chapter05.html
 
 The fundamental technique we employ, introduced by `Michael Robbelard at PyOhio
-2013`_, is to write SQL queries that typecast results to table types, and then
-use a :mod:`psycopg2` :class:`~psycopg2.extra.CompositeCaster` to map
+2013`_, is to write SQL queries that "typecast" results to table types, and then
+use a :class:`~psycopg2.extras.CompositeCaster` subclass to map
 these to Python objects.  This means we get to define our schema in SQL, and we
 get to write our queries in SQL, and we get to explicitly indicate in our SQL
 queries how Python should map the results to objects, and then we can write
@@ -116,9 +116,13 @@ you cast to the relevant type in your query. If your query returns more than
 one column, you'll need to dereference the column containing the model just as
 with any other query:
 
-    >>> rec = db.one("SELECT foo, bar.* "
-    ...              "FROM foo JOIN bar ON foo.bar = bar.bar "
-    ...              "ORDER BY foo.bar LIMIT 1")
+    >>> rec = db.one(\"""
+    ...     SELECT foo, bar.*
+    ...       FROM foo
+    ...       JOIN bar ON foo.bar = bar.bar
+    ...   ORDER BY foo.bar
+    ...      LIMIT 1
+    ... \""")
     >>> rec.foo.bar
     'blam'
     >>> rec.bar
@@ -142,9 +146,7 @@ To update your database, add a method to your model:
     ...     typname = "foo"
     ...
     ...     def update_baz(self, baz):
-    ...         self.db.run( "UPDATE foo SET baz=%s WHERE bar=%s"
-    ...                    , (baz, self.bar)
-    ...                     )
+    ...         self.db.run("UPDATE foo SET baz=%s WHERE bar=%s", (baz, self.bar))
     ...         self.set_attributes(baz=baz)
     ...
     >>> db.register_model(Foo)
