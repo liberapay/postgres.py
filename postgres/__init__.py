@@ -694,6 +694,10 @@ def make_DelegatingCaster(postgres):
             instance = ModelSubclass(self.attnames, values)
             return instance
 
+        def _create_type(self):
+            # Override to avoid creation of unused namedtuple class
+            pass
+
         def _refetch_type_info(self, curs):
             """Given a cursor, update the current object with a fresh type definition.
             """
