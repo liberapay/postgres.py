@@ -186,16 +186,6 @@ class UnknownAttributes(Exception):
         return "The following attribute(s) are unknown to us: {}." \
                .format(", ".join(self.args[0]))
 
-class NotBound(Exception):
-    def __str__(self):
-        return "You have to set {}.typname to the name of a type in your " \
-               "database.".format(self.args[0].__name__)
-
-class NotRegistered(Exception):
-    def __str__(self):
-        return "You have to register {} with a Postgres instance." \
-               .format(self.args[0].__name__)
-
 
 
 # Stuff
@@ -219,9 +209,6 @@ class Model(object):
     _read_only_attributes = None            # set in ModelCaster._from_db()
 
     def __init__(self, values):
-        if self.db is None:
-            raise NotBound(self)
-        self.db.check_registration(self.__class__, include_subsubclasses=True)
         self.__dict__.update(zip(self._read_only_attributes, values))
 
     def __setattr__(self, name, value):
