@@ -178,7 +178,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 class ReadOnly(Exception):
     def __str__(self):
         return "{} is a read-only attribute. Your Model should implement " \
-               "methods to change data; use update_local from your methods " \
+               "methods to change data; use set_attributes from your methods " \
                "to sync local state.".format(self.args[0])
 
 class UnknownAttributes(Exception):
