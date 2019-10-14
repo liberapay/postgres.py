@@ -218,14 +218,13 @@ class Model(object):
 
     typname = None                          # an entry in pg_type
     db = None                               # will be set to a Postgres object
-    __read_only_attributes = []             # bootstrap
 
     def __init__(self, record):
         if self.db is None:
             raise NotBound(self)
         self.db.check_registration(self.__class__, include_subsubclasses=True)
         self.__read_only_attributes = record.keys()
-        self.set_attributes(**record)
+        self.__dict__.update(**record)
 
     def __setattr__(self, name, value):
         if name in self.__read_only_attributes:
@@ -245,10 +244,13 @@ class Model(object):
         will be column names for table and view types.
 
         """
-        unknown = []
+        unknown = None
         for name in kw:
             if name not in self.__read_only_attributes:
-                unknown.append(name)
+                if unknown is None:
+                    unknown = [name]
+                else:
+                    unknown.append(name)
         if unknown:
             raise UnknownAttributes(unknown)
         self.__dict__.update(**kw)
