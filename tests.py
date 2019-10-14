@@ -363,6 +363,8 @@ class TestORM(WithData):
 
     class MyModel(Model):
 
+        __slots__ = ('bar', '__dict__')
+
         typname = "foo"
 
         def __init__(self, values):
@@ -414,9 +416,8 @@ class TestORM(WithData):
 
     def test_attributes_are_read_only(self):
         one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
-        def assign():
+        with self.assertRaises(ReadOnly):
             one.bar = "blah"
-        self.assertRaises(ReadOnly, assign)
 
     def test_check_register_raises_if_passed_a_model_instance(self):
         obj = self.MyModel(['baz'])
