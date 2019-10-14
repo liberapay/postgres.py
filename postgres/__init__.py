@@ -693,7 +693,7 @@ class ModelCaster(CompositeCaster):
         self.__dict__.update(new_self.__dict__)
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
     db = Postgres()
     db.run("DROP SCHEMA IF EXISTS public CASCADE")
     db.run("CREATE SCHEMA public")

@@ -525,7 +525,7 @@ def isexception(obj):
     return False
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
     from postgres import Postgres
     db = Postgres()
     db.run("DROP SCHEMA IF EXISTS public CASCADE")

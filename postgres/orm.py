@@ -250,7 +250,7 @@ class Model(object):
             super(Model, self).__setattr__(name, value)
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
 
     from postgres import Postgres
     db = Postgres()
