@@ -399,21 +399,21 @@ class TestORM(WithData):
             self.db.register_model(Model)
 
     def test_orm_basically_works(self):
-        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
         assert one.__class__ == self.MyModel
 
     def test_orm_models_get_kwargs_to_init(self):
-        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
         assert one.bar_from_init == 'baz'
 
     def test_updating_attributes_works(self):
-        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
         one.update_bar("blah")
         bar = self.db.one("SELECT bar FROM foo WHERE bar='blah'")
         assert bar == one.bar
 
     def test_attributes_are_read_only(self):
-        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
         def assign():
             one.bar = "blah"
         self.assertRaises(ReadOnly, assign)
@@ -446,7 +446,7 @@ class TestORM(WithData):
         self.installFlah()
         self.db.run("INSERT INTO flah VALUES ('double')")
         self.db.run("INSERT INTO flah VALUES ('trouble')")
-        flah = self.db.one("SELECT flah.*::flah FROM flah WHERE bar='double'")
+        flah = self.db.one("SELECT flah FROM flah WHERE bar='double'")
         assert flah.bar == "double"
 
     def test_check_register_returns_string_for_single(self):
@@ -475,7 +475,7 @@ class TestORM(WithData):
 
     def test_add_column_doesnt_break_anything(self):
         self.db.run("ALTER TABLE foo ADD COLUMN boo text")
-        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
         assert one.boo is None
 
     def test_replace_column_different_type(self):
@@ -487,7 +487,7 @@ class TestORM(WithData):
         self.db.run("ALTER TABLE grok ADD COLUMN biz text NOT NULL DEFAULT 'x'")
         self.db.run("ALTER TABLE grok DROP COLUMN bar")
         # The number of columns hasn't changed but the names and types have
-        one = self.db.one("SELECT grok.*::grok FROM grok LIMIT 1")
+        one = self.db.one("SELECT grok FROM grok LIMIT 1")
         assert one.biz == 'x'
         assert not hasattr(one, 'bar')
 
@@ -495,7 +495,7 @@ class TestORM(WithData):
     def test_replace_column_same_type_different_name(self):
         self.db.run("ALTER TABLE foo ADD COLUMN biz text NOT NULL DEFAULT 0")
         self.db.run("ALTER TABLE foo DROP COLUMN bar")
-        one = self.db.one("SELECT foo.*::foo FROM foo LIMIT 1")
+        one = self.db.one("SELECT foo FROM foo LIMIT 1")
         assert one.biz == 0
         assert not hasattr(one, 'bar')
 

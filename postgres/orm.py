@@ -47,7 +47,7 @@ level::
     +------+-----+
     (2 rows)
 
-    test=# SELECT foo.*::foo FROM foo;
+    test=# SELECT foo FROM foo;
     +------------+
     |    foo     |
     +------------+
@@ -71,7 +71,7 @@ The same thing works for views::
     +------+
     (2 rows)
 
-    test=# SELECT bar.*::bar FROM bar;
+    test=# SELECT bar FROM bar;
     +--------+
     |  bar   |
     +--------+
@@ -116,7 +116,7 @@ you cast to the relevant type in your query. If your query returns more than
 one column, you'll need to dereference the column containing the model just as
 with any other query:
 
-    >>> rec = db.one("SELECT foo.*::foo, bar.* "
+    >>> rec = db.one("SELECT foo, bar.* "
     ...              "FROM foo JOIN bar ON foo.bar = bar.bar "
     ...              "ORDER BY foo.bar LIMIT 1")
     >>> rec.foo.bar
@@ -128,10 +128,10 @@ And as usual, if your query only returns one column, then
 :meth:`~postgres.Postgres.one` and :meth:`~postgres.Postgres.all`
 will do the dereferencing for you:
 
-    >>> foo = db.one("SELECT foo.*::foo FROM foo WHERE bar='blam'")
+    >>> foo = db.one("SELECT foo FROM foo WHERE bar='blam'")
     >>> foo.bar
     'blam'
-    >>> [foo.bar for foo in db.all("SELECT foo.*::foo FROM foo")]
+    >>> [foo.bar for foo in db.all("SELECT foo FROM foo")]
     ['blam', 'whit']
 
 To update your database, add a method to your model:
@@ -153,7 +153,7 @@ Then use that method to update the database:
 
     >>> db.one("SELECT baz FROM foo WHERE bar='blam'")
     42
-    >>> foo = db.one("SELECT foo.*::foo FROM foo WHERE bar='blam'")
+    >>> foo = db.one("SELECT foo FROM foo WHERE bar='blam'")
     >>> foo.update_baz(90210)
     >>> foo.baz
     90210
