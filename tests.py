@@ -4,12 +4,15 @@ from collections import namedtuple
 import sys
 from unittest import TestCase
 
-from postgres import Postgres, NotAModel, NotRegistered, NoSuchType, NoTypeSpecified
+from postgres import (
+    AlreadyRegistered, NotAModel, NotRegistered, NoSuchType, NoTypeSpecified,
+    Postgres,
+)
 from postgres.cursors import (
     BadBackAs, TooFew, TooMany,
     Row, SimpleDictCursor, SimpleNamedTupleCursor, SimpleRowCursor, SimpleTupleCursor,
 )
-from postgres.orm import ReadOnly, Model
+from postgres.orm import Model, ReadOnly, UnknownAttributes
 from psycopg2.errors import InterfaceError, ProgrammingError, ReadOnlySqlTransaction
 from pytest import mark, raises
 
@@ -363,11 +366,13 @@ class TestORM(WithData):
 
     class MyModel(Model):
 
+        __slots__ = ('bar', '__dict__')
+
         typname = "foo"
 
-        def __init__(self, record):
-            Model.__init__(self, record)
-            self.bar_from_init = record['bar']
+        def __init__(self, values):
+            Model.__init__(self, values)
+            self.bar_from_init = self.bar
 
         def update_bar(self, bar):
             self.db.run("UPDATE foo SET bar=%s WHERE bar=%s", (bar, self.bar))
@@ -390,6 +395,14 @@ class TestORM(WithData):
         self.db.run("CREATE TABLE foo.flah (bar text)")
         self.db.register_model(self.MyModel, 'foo.flah')
 
+    def test_register_model_raises_AlreadyRegistered(self):
+        with self.assertRaises(AlreadyRegistered) as context:
+            self.db.register_model(self.MyModel)
+        assert context.exception.args == (self.MyModel, self.MyModel.typname)
+        assert str(context.exception) == (
+            "The model MyModel is already registered for the typname foo."
+        )
+
     def test_register_model_raises_NoSuchType(self):
         with self.assertRaises(NoSuchType):
             self.db.register_model(self.MyModel, 'nonexistent')
@@ -399,27 +412,37 @@ class TestORM(WithData):
             self.db.register_model(Model)
 
     def test_orm_basically_works(self):
-        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
         assert one.__class__ == self.MyModel
 
     def test_orm_models_get_kwargs_to_init(self):
-        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
         assert one.bar_from_init == 'baz'
 
     def test_updating_attributes_works(self):
-        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
         one.update_bar("blah")
         bar = self.db.one("SELECT bar FROM foo WHERE bar='blah'")
         assert bar == one.bar
 
+    def test_setting_unknown_attributes(self):
+        one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
+        with self.assertRaises(UnknownAttributes) as context:
+            one.set_attributes(bar='blah', x=0, y=1)
+        assert sorted(context.exception.args[0]) == ['x', 'y']
+        assert str(context.exception) == (
+            "The following attribute(s) are unknown to us: %s."
+        ) % ', '.join(context.exception.args[0])
+
     def test_attributes_are_read_only(self):
-        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
-        def assign():
+        one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
+        with self.assertRaises(ReadOnly) as context:
             one.bar = "blah"
-        self.assertRaises(ReadOnly, assign)
+        assert context.exception.args == ("bar",)
+        assert str(context.exception).startswith("bar is a read-only attribute.")
 
     def test_check_register_raises_if_passed_a_model_instance(self):
-        obj = self.MyModel({'bar': 'baz'})
+        obj = self.MyModel(['baz'])
         raises(NotAModel, self.db.check_registration, obj)
 
     def test_check_register_doesnt_include_subsubclasses(self):
@@ -446,7 +469,7 @@ class TestORM(WithData):
         self.installFlah()
         self.db.run("INSERT INTO flah VALUES ('double')")
         self.db.run("INSERT INTO flah VALUES ('trouble')")
-        flah = self.db.one("SELECT flah.*::flah FROM flah WHERE bar='double'")
+        flah = self.db.one("SELECT flah FROM flah WHERE bar='double'")
         assert flah.bar == "double"
 
     def test_check_register_returns_string_for_single(self):
@@ -475,7 +498,7 @@ class TestORM(WithData):
 
     def test_add_column_doesnt_break_anything(self):
         self.db.run("ALTER TABLE foo ADD COLUMN boo text")
-        one = self.db.one("SELECT foo.*::foo FROM foo WHERE bar='baz'")
+        one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
         assert one.boo is None
 
     def test_replace_column_different_type(self):
@@ -487,7 +510,7 @@ class TestORM(WithData):
         self.db.run("ALTER TABLE grok ADD COLUMN biz text NOT NULL DEFAULT 'x'")
         self.db.run("ALTER TABLE grok DROP COLUMN bar")
         # The number of columns hasn't changed but the names and types have
-        one = self.db.one("SELECT grok.*::grok FROM grok LIMIT 1")
+        one = self.db.one("SELECT grok FROM grok LIMIT 1")
         assert one.biz == 'x'
         assert not hasattr(one, 'bar')
 
@@ -495,7 +518,7 @@ class TestORM(WithData):
     def test_replace_column_same_type_different_name(self):
         self.db.run("ALTER TABLE foo ADD COLUMN biz text NOT NULL DEFAULT 0")
         self.db.run("ALTER TABLE foo DROP COLUMN bar")
-        one = self.db.one("SELECT foo.*::foo FROM foo LIMIT 1")
+        one = self.db.one("SELECT foo FROM foo LIMIT 1")
         assert one.biz == 0
         assert not hasattr(one, 'bar')
 

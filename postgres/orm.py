@@ -13,8 +13,8 @@ database usage.
 .. _Django's ORM: http://www.djangobook.com/en/2.0/chapter05.html
 
 The fundamental technique we employ, introduced by `Michael Robbelard at PyOhio
-2013`_, is to write SQL queries that typecast results to table types, and then
-use a :mod:`psycopg2` :class:`~psycopg2.extra.CompositeCaster` to map
+2013`_, is to write SQL queries that "typecast" results to table types, and then
+use a :class:`~psycopg2.extras.CompositeCaster` subclass to map
 these to Python objects.  This means we get to define our schema in SQL, and we
 get to write our queries in SQL, and we get to explicitly indicate in our SQL
 queries how Python should map the results to objects, and then we can write
@@ -47,7 +47,7 @@ level::
     +------+-----+
     (2 rows)
 
-    test=# SELECT foo.*::foo FROM foo;
+    test=# SELECT foo FROM foo;
     +------------+
     |    foo     |
     +------------+
@@ -71,7 +71,7 @@ The same thing works for views::
     +------+
     (2 rows)
 
-    test=# SELECT bar.*::bar FROM bar;
+    test=# SELECT bar FROM bar;
     +--------+
     |  bar   |
     +--------+
@@ -116,9 +116,13 @@ you cast to the relevant type in your query. If your query returns more than
 one column, you'll need to dereference the column containing the model just as
 with any other query:
 
-    >>> rec = db.one("SELECT foo.*::foo, bar.* "
-    ...              "FROM foo JOIN bar ON foo.bar = bar.bar "
-    ...              "ORDER BY foo.bar LIMIT 1")
+    >>> rec = db.one(\"""
+    ...     SELECT foo, bar.*
+    ...       FROM foo
+    ...       JOIN bar ON foo.bar = bar.bar
+    ...   ORDER BY foo.bar
+    ...      LIMIT 1
+    ... \""")
     >>> rec.foo.bar
     'blam'
     >>> rec.bar
@@ -128,10 +132,10 @@ And as usual, if your query only returns one column, then
 :meth:`~postgres.Postgres.one` and :meth:`~postgres.Postgres.all`
 will do the dereferencing for you:
 
-    >>> foo = db.one("SELECT foo.*::foo FROM foo WHERE bar='blam'")
+    >>> foo = db.one("SELECT foo FROM foo WHERE bar='blam'")
     >>> foo.bar
     'blam'
-    >>> [foo.bar for foo in db.all("SELECT foo.*::foo FROM foo")]
+    >>> [foo.bar for foo in db.all("SELECT foo FROM foo")]
     ['blam', 'whit']
 
 To update your database, add a method to your model:
@@ -142,9 +146,7 @@ To update your database, add a method to your model:
     ...     typname = "foo"
     ...
     ...     def update_baz(self, baz):
-    ...         self.db.run( "UPDATE foo SET baz=%s WHERE bar=%s"
-    ...                    , (baz, self.bar)
-    ...                     )
+    ...         self.db.run("UPDATE foo SET baz=%s WHERE bar=%s", (baz, self.bar))
     ...         self.set_attributes(baz=baz)
     ...
     >>> db.register_model(Foo)
@@ -153,7 +155,7 @@ Then use that method to update the database:
 
     >>> db.one("SELECT baz FROM foo WHERE bar='blam'")
     42
-    >>> foo = db.one("SELECT foo.*::foo FROM foo WHERE bar='blam'")
+    >>> foo = db.one("SELECT foo FROM foo WHERE bar='blam'")
     >>> foo.update_baz(90210)
     >>> foo.baz
     90210
@@ -178,23 +180,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 class ReadOnly(Exception):
     def __str__(self):
         return "{} is a read-only attribute. Your Model should implement " \
-               "methods to change data; use update_local from your methods " \
+               "methods to change data; use set_attributes from your methods " \
                "to sync local state.".format(self.args[0])
 
 class UnknownAttributes(Exception):
     def __str__(self):
         return "The following attribute(s) are unknown to us: {}." \
                .format(", ".join(self.args[0]))
-
-class NotBound(Exception):
-    def __str__(self):
-        return "You have to set {}.typname to the name of a type in your " \
-               "database.".format(self.args[0].__name__)
-
-class NotRegistered(Exception):
-    def __str__(self):
-        return "You have to register {} with a Postgres instance." \
-               .format(self.args[0].__name__)
 
 
 
@@ -203,8 +195,6 @@ class NotRegistered(Exception):
 
 class Model(object):
     """This is the base class for models in :mod:`postgres.orm`.
-
-    :param dict record: The raw query result
 
     Instances of subclasses of :class:`~postgres.orm.Model` will have an
     attribute for each field in the composite type for which the subclass is
@@ -216,19 +206,21 @@ class Model(object):
 
     """
 
+    __slots__ = ()
+
     typname = None                          # an entry in pg_type
     db = None                               # will be set to a Postgres object
-    __read_only_attributes = []             # bootstrap
+    _read_only_attributes = None            # set in ModelCaster._from_db()
 
-    def __init__(self, record):
-        if self.db is None:
-            raise NotBound(self)
-        self.db.check_registration(self.__class__, include_subsubclasses=True)
-        self.__read_only_attributes = record.keys()
-        self.set_attributes(**record)
+    def __init__(self, values):
+        if getattr(self, '__slots__', None):
+            for name, value in zip(self._read_only_attributes, values):
+                super(Model, self).__setattr__(name, value)
+        else:
+            self.__dict__.update(zip(self._read_only_attributes, values))
 
     def __setattr__(self, name, value):
-        if name in self.__read_only_attributes:
+        if name in self._read_only_attributes:
             raise ReadOnly(name)
         return super(Model, self).__setattr__(name, value)
 
@@ -245,16 +237,20 @@ class Model(object):
         will be column names for table and view types.
 
         """
-        unknown = []
+        unknown = None
         for name in kw:
-            if name not in self.__read_only_attributes:
-                unknown.append(name)
+            if name not in self._read_only_attributes:
+                if unknown is None:
+                    unknown = [name]
+                else:
+                    unknown.append(name)
         if unknown:
             raise UnknownAttributes(unknown)
-        self.__dict__.update(**kw)
+        for name, value in kw.items():
+            super(Model, self).__setattr__(name, value)
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
 
     from postgres import Postgres
     db = Postgres()
