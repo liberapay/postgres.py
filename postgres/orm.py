@@ -177,13 +177,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 # Exceptions
 # ==========
 
-class ReadOnly(Exception):
+class ReadOnlyAttribute(AttributeError):
     def __str__(self):
         return "{} is a read-only attribute. Your Model should implement " \
                "methods to change data; use set_attributes from your methods " \
                "to sync local state.".format(self.args[0])
 
-class UnknownAttributes(Exception):
+class UnknownAttributes(AttributeError):
     def __str__(self):
         return "The following attribute(s) are unknown to us: {}." \
                .format(", ".join(self.args[0]))
@@ -221,7 +221,7 @@ class Model(object):
 
     def __setattr__(self, name, value):
         if name in self._read_only_attributes:
-            raise ReadOnly(name)
+            raise ReadOnlyAttribute(name)
         return super(Model, self).__setattr__(name, value)
 
     def set_attributes(self, **kw):
