@@ -214,8 +214,9 @@ class Model(object):
 
     def __init__(self, values):
         if getattr(self, '__slots__', None):
+            _setattr = super(Model, self).__setattr__
             for name, value in zip(self.__class__.attnames, values):
-                super(Model, self).__setattr__(name, value)
+                _setattr(name, value)
         else:
             self.__dict__.update(zip(self.__class__.attnames, values))
 
@@ -247,8 +248,9 @@ class Model(object):
                     unknown.append(name)
         if unknown:
             raise UnknownAttributes(unknown)
+        _setattr = super(Model, self).__setattr__
         for name, value in kw.items():
-            super(Model, self).__setattr__(name, value)
+            _setattr(name, value)
 
 
 if __name__ == '__main__':  # pragma: no cover
