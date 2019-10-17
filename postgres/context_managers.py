@@ -104,17 +104,21 @@ class CursorSubcontextManager(object):
 
     __slots__ = ('cursor', 'back_as', 'outer_back_as')
 
-    def __init__(self, cursor, back_as=None):
+    PRESERVE = object()
+
+    def __init__(self, cursor, back_as=PRESERVE):
         self.cursor = cursor
         self.back_as = back_as
 
     def __enter__(self):
-        self.outer_back_as = self.cursor.back_as
-        self.cursor.back_as = self.back_as
+        if self.back_as is not self.PRESERVE:
+            self.outer_back_as = self.cursor.back_as
+            self.cursor.back_as = self.back_as
         return self.cursor
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.cursor.back_as = self.outer_back_as
+        if self.back_as is not self.PRESERVE:
+            self.cursor.back_as = self.outer_back_as
 
 
 class ConnectionContextManager(object):
