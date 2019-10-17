@@ -302,10 +302,11 @@ class TestCursor(WithData):
 
     def test_get_cursor_supports_subtransactions(self):
         before_count = self.db.one("SELECT count(*) FROM foo")
-        with self.db.get_cursor() as outer_cursor:
+        with self.db.get_cursor(back_as='dict') as outer_cursor:
             outer_cursor.execute("INSERT INTO foo VALUES ('lorem')")
             with self.db.get_cursor(cursor=outer_cursor) as inner_cursor:
                 assert inner_cursor is outer_cursor
+                assert inner_cursor.back_as == 'dict'
                 inner_cursor.execute("INSERT INTO foo VALUES ('ipsum')")
         after_count = self.db.one("SELECT count(*) FROM foo")
         assert after_count == (before_count + 2)
