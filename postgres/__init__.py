@@ -662,7 +662,7 @@ class ModelCaster(CompositeCaster):
                 raise NoSuchType(typname)
         caster.db = ModelSubclass.db = db
         caster.ModelSubclass = ModelSubclass
-        ModelSubclass._read_only_attributes = OrderedDict.fromkeys(caster.attnames)
+        ModelSubclass.attnames = OrderedDict.fromkeys(caster.attnames)
         return caster
 
     def parse(self, s, curs, retry=True):

@@ -12,7 +12,7 @@ from postgres.cursors import (
     BadBackAs, TooFew, TooMany,
     Row, SimpleDictCursor, SimpleNamedTupleCursor, SimpleRowCursor, SimpleTupleCursor,
 )
-from postgres.orm import Model, ReadOnly, UnknownAttributes
+from postgres.orm import Model, ReadOnlyAttribute, UnknownAttributes
 from psycopg2.errors import InterfaceError, ProgrammingError, ReadOnlySqlTransaction
 from pytest import mark, raises
 
@@ -437,7 +437,7 @@ class TestORM(WithData):
 
     def test_attributes_are_read_only(self):
         one = self.db.one("SELECT foo FROM foo WHERE bar='baz'")
-        with self.assertRaises(ReadOnly) as context:
+        with self.assertRaises(ReadOnlyAttribute) as context:
             one.bar = "blah"
         assert context.exception.args == ("bar",)
         assert str(context.exception).startswith("bar is a read-only attribute.")

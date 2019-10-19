@@ -177,13 +177,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 # Exceptions
 # ==========
 
-class ReadOnly(Exception):
+class ReadOnlyAttribute(AttributeError):
     def __str__(self):
         return "{} is a read-only attribute. Your Model should implement " \
                "methods to change data; use set_attributes from your methods " \
                "to sync local state.".format(self.args[0])
 
-class UnknownAttributes(Exception):
+class UnknownAttributes(AttributeError):
     def __str__(self):
         return "The following attribute(s) are unknown to us: {}." \
                .format(", ".join(self.args[0]))
@@ -210,18 +210,19 @@ class Model(object):
 
     typname = None                          # an entry in pg_type
     db = None                               # will be set to a Postgres object
-    _read_only_attributes = None            # set in ModelCaster._from_db()
+    attnames = None                         # set in ModelCaster._from_db()
 
     def __init__(self, values):
         if getattr(self, '__slots__', None):
-            for name, value in zip(self._read_only_attributes, values):
-                super(Model, self).__setattr__(name, value)
+            _setattr = super(Model, self).__setattr__
+            for name, value in zip(self.__class__.attnames, values):
+                _setattr(name, value)
         else:
-            self.__dict__.update(zip(self._read_only_attributes, values))
+            self.__dict__.update(zip(self.__class__.attnames, values))
 
     def __setattr__(self, name, value):
-        if name in self._read_only_attributes:
-            raise ReadOnly(name)
+        if name in self.__class__.attnames:
+            raise ReadOnlyAttribute(name)
         return super(Model, self).__setattr__(name, value)
 
     def set_attributes(self, **kw):
@@ -238,16 +239,18 @@ class Model(object):
 
         """
         unknown = None
+        attnames = self.__class__.attnames
         for name in kw:
-            if name not in self._read_only_attributes:
+            if name not in attnames:
                 if unknown is None:
                     unknown = [name]
                 else:
                     unknown.append(name)
         if unknown:
             raise UnknownAttributes(unknown)
+        _setattr = super(Model, self).__setattr__
         for name, value in kw.items():
-            super(Model, self).__setattr__(name, value)
+            _setattr(name, value)
 
 
 if __name__ == '__main__':  # pragma: no cover
