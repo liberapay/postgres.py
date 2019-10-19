@@ -293,8 +293,7 @@ class Postgres(object):
     by this :class:`~postgres.Postgres` instance will use. See the
     :ref:`simple-cursors` documentation below for additional options. Whatever
     default you set here, you can override that default on a per-call basis by
-    passing :attr:`cursor_factory` to :meth:`~postgres.Postgres.one`,
-    :meth:`~postgres.Postgres.all`, and :meth:`~postgres.Postgres.get_cursor`.
+    passing :attr:`cursor_factory` to :meth:`~postgres.Postgres.get_cursor`.
 
     The names in our simple API, :meth:`~postgres.Postgres.run`,
     :meth:`~postgres.Postgres.one`, and :meth:`~postgres.Postgres.all`,
