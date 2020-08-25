@@ -42,7 +42,7 @@ Changelog
 - **BREAKING**: the :meth:`~postgres.Postgres.check_registration` method now always returns a list (:pr:`87`)
 - PostgreSQL versions older than 9.2 are no longer supported (:pr:`83`)
 - idle connections are now kept open for up to 10 minutes by default (:pr:`81`)
-- the methods :meth:`~postgres.Postgres.run`, :meth:`~postgres.Postgres.one` and :meth:`~postgres.Postgres.all` now support receiving query paramaters as keyword arguments (:pr:`79`)
+- the methods :meth:`~postgres.Postgres.run`, :meth:`~postgres.Postgres.one` and :meth:`~postgres.Postgres.all` now support receiving query parameters as keyword arguments (:pr:`79`)
 - **BREAKING**: the methods :meth:`~postgres.Postgres.run`, :meth:`~postgres.Postgres.one` and :meth:`~postgres.Postgres.all` no longer pass extra arguments to :meth:`~postgres.Postgres.get_cursor` (:pr:`79` and :pr:`67`)
 - subtransactions are now supported (:pr:`78` and :pr:`90`)
 - **BREAKING**: single-column rows aren't unpacked anymore when the `back_as` argument is provided (:pr:`77`)
