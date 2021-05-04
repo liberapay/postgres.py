@@ -5,7 +5,6 @@ The :mod:`postgres` library extends the cursors provided by
 and :meth:`all`.
 
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from inspect import isclass
 from operator import itemgetter
@@ -62,7 +61,7 @@ class TooMany(OutOfBounds):
 # Cursors
 # =======
 
-class SimpleCursorBase(object):
+class SimpleCursorBase:
     """
 
     This is a mixin to provide a simpler API atop the usual DB-API 2.0 API
@@ -390,7 +389,7 @@ def return_tuple_as_is(cols, vals):
     return vals
 
 
-class Row(object):
+class Row:
     """A versatile row type.
     """
 

@@ -8,11 +8,11 @@ Installation
 
     $ pip install postgres
 
-:mod:`postgres` requires `psycopg2`_ version 2.7.5 or higher.
+:mod:`postgres` requires `psycopg2`_ version 2.8 or higher.
 
-We `test <https://travis-ci.org/chadwhitacre/postgres.py>`_ against Python 2.7, 3.5,
-3.6, and 3.7. We don't yet have a testing matrix for different versions of
-:mod:`psycopg2` or PostgreSQL.
+We currently `test <https://travis-ci.org/chadwhitacre/postgres.py>`_ against
+Python 3.6, 3.7, 3.8 and 3.9. We don't have a testing matrix for different
+versions of :mod:`psycopg2` or PostgreSQL.
 
 :mod:`postgres` is released under the `MIT license`_.
 
@@ -163,11 +163,9 @@ The Postgres Object
 .. _SQL injection: http://en.wikipedia.org/wiki/SQL_injection
 
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from collections import OrderedDict, namedtuple
 from inspect import isclass
-import sys
 
 import psycopg2
 from psycopg2 import DataError, InterfaceError, ProgrammingError
@@ -184,15 +182,6 @@ from postgres.cursors import (
     BadBackAs, Row, SimpleCursorBase, SimpleNamedTupleCursor,
 )
 from postgres.orm import Model
-
-
-if sys.version_info[0] == 2:    # Python 2
-    # "Note: In Python 2, if you want to uniformly receive all your database
-    # input in Unicode, you can register the related typecasters globally as
-    # soon as Psycopg is imported."
-    #   -- http://initd.org/psycopg/docs/usage.html#unicode-handling
-    psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
-    psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
 
 __version__ = '3.0.0'
@@ -249,7 +238,7 @@ default_back_as_registry = {
 }
 
 
-class Postgres(object):
+class Postgres:
     """Interact with a `PostgreSQL <http://www.postgresql.org/>`_ database.
 
     :param str url: A ``postgres://`` URL or a `PostgreSQL connection string
@@ -652,11 +641,8 @@ class ModelCaster(CompositeCaster):
     def _from_db(cls, db, typname, ModelSubclass):
         # Override to set custom attributes.
         with db.get_cursor(autocommit=True, readonly=True) as cursor:
-            name = typname
-            if sys.version_info[0] < 3:
-                name = name.encode('UTF-8')
             try:
-                caster = super(ModelCaster, cls)._from_db(name, cursor)
+                caster = super(ModelCaster, cls)._from_db(typname, cursor)
             except ProgrammingError:
                 raise NoSuchType(typname)
         caster.db = ModelSubclass.db = db

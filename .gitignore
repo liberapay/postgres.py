@@ -6,4 +6,6 @@ docs/_build
 env
 env2
 *.egg-info
+htmlcov/
 .python-version
+.tox/

@@ -171,7 +171,6 @@ The Model Base Class
 --------------------
 
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 
 # Exceptions
@@ -193,7 +192,7 @@ class UnknownAttributes(AttributeError):
 # Stuff
 # =====
 
-class Model(object):
+class Model:
     """This is the base class for models in :mod:`postgres.orm`.
 
     Instances of subclasses of :class:`~postgres.orm.Model` will have an
