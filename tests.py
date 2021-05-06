@@ -1,7 +1,4 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from collections import namedtuple
-import sys
 from unittest import TestCase
 
 from postgres import (
@@ -658,8 +655,7 @@ class TestRowCursorFactory(WithCursorFactory):
         assert r[1] == 43
         assert r.value == 43
         assert r['value'] == 43
-        if sys.version_info >= (3, 0):
-            assert repr(r) == "Row(key='biz', value=43)"
+        assert repr(r) == "Row(key='biz', value=43)"
 
     def test_all(self):
         rows = self.db.all("SELECT * FROM foo ORDER BY key")
@@ -712,8 +708,6 @@ class TestRowCursorFactory(WithCursorFactory):
         assert r['?column?'] == 2
         assert r['3'] == 3
 
-    @mark.xfail(sys.version_info < (3, 0),
-                reason="Unicode attribute names require Python >= 3.0")
     def test_nonascii_names(self):
         r = self.db.one('SELECT 1 as \xe5h\xe9, 2 as \u2323')
         assert getattr(r, '\xe5h\xe9') == 1

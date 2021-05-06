@@ -35,6 +35,10 @@ An Object-Relational Mapper (ORM)
 Changelog
 ---------
 
+**4.0 (???)**
+
+- dropped support for Python 2.7 and 3.5 (:pr:`96`)
+
 **3.0.0 (Oct 19, 2019)**
 
 - the :class:`ReadOnly` exception has been renamed to :class:`ReadOnlyAttribute`, and the :attr:`_read_only_attributes` attribute of the :class:`~postgres.orm.Model` class has been renamed to :attr:`attnames` (:pr:`91`)

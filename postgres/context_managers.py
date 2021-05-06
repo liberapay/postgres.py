@@ -1,9 +1,7 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from psycopg2 import InterfaceError
 
 
-class CursorContextManager(object):
+class CursorContextManager:
     """Instantiated once per :func:`~postgres.Postgres.get_cursor` call.
 
     :param pool: see :mod:`psycopg2_pool`
@@ -49,7 +47,7 @@ class CursorContextManager(object):
         self.pool.putconn(self.conn)
 
 
-class ConnectionCursorContextManager(object):
+class ConnectionCursorContextManager:
     """Creates a cursor from the given connection, then wraps it in a context
     manager that automatically commits or rolls back the changes on exit.
 
@@ -91,7 +89,7 @@ class ConnectionCursorContextManager(object):
         self.conn.__exit__(exc_type, exc_val, exc_tb)
 
 
-class CursorSubcontextManager(object):
+class CursorSubcontextManager:
     """Wraps a cursor so that it can be used for a subtransaction.
 
     See :meth:`~postgres.Postgres.get_cursor` for an explanation of subtransactions.
@@ -121,7 +119,7 @@ class CursorSubcontextManager(object):
             self.cursor.back_as = self.outer_back_as
 
 
-class ConnectionContextManager(object):
+class ConnectionContextManager:
     """Instantiated once per :func:`~postgres.Postgres.get_connection` call.
 
     :param pool: see :mod:`psycopg2_pool`
