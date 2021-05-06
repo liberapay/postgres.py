@@ -255,5 +255,5 @@ texinfo_documents = [
 # -- Options for extensions ----------------------------------------------------
 
 extlinks = {
-    'pr': ('https://github.com/chadwhitacre/postgres.py/pull/%s', '#'),
+    'pr': ('https://github.com/liberapay/postgres.py/pull/%s', '#'),
 }

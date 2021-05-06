@@ -10,7 +10,7 @@ Installation
 
 :mod:`postgres` requires `psycopg2`_ version 2.8 or higher.
 
-We currently `test <https://travis-ci.org/chadwhitacre/postgres.py>`_ against
+We currently `test <https://travis-ci.org/liberapay/postgres.py>`_ against
 Python 3.6, 3.7, 3.8 and 3.9. We don't have a testing matrix for different
 versions of :mod:`psycopg2` or PostgreSQL.
 
@@ -153,10 +153,10 @@ The Postgres Object
 -------------------
 
 .. _psycopg2: http://initd.org/psycopg/
-.. _GitHub: https://github.com/chadwhitacre/postgres.py
+.. _GitHub: https://github.com/liberapay/postgres.py
 .. _PyPI: https://pypi.python.org/pypi/postgres
 .. _this advice: http://initd.org/psycopg/docs/usage.html#unicode-handling
-.. _MIT license: https://github.com/chadwhitacre/postgres.py/blob/master/LICENSE
+.. _MIT license: https://github.com/liberapay/postgres.py/blob/master/LICENSE
 .. _sql: https://pypi.python.org/pypi/sql
 .. _Records: https://github.com/kennethreitz/records
 .. _DB-API 2.0: http://www.python.org/dev/peps/pep-0249/
@@ -296,8 +296,8 @@ class Postgres:
     rationale behind these names. The context managers on this class are named
     starting with :meth:`get_` to set them apart from the simple-case API.
 
-    .. _16: https://github.com/chadwhitacre/postgres.py/issues/16
-    .. _20: https://github.com/chadwhitacre/postgres.py/issues/20
+    .. _16: https://github.com/liberapay/postgres.py/issues/16
+    .. _20: https://github.com/liberapay/postgres.py/issues/20
 
     """
 
@@ -652,7 +652,7 @@ class ModelCaster(CompositeCaster):
 
     def parse(self, s, curs, retry=True):
         # Override to protect against some race conditions:
-        #   https://github.com/chadwhitacre/postgres.py/issues/26
+        #   https://github.com/liberapay/postgres.py/issues/26
         try:
             return super(ModelCaster, self).parse(s, curs)
         except (DataError, ValueError):
