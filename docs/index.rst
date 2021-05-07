@@ -24,6 +24,14 @@ Simple Cursors
     :member-order: bysource
 
 
+Caching
+-------
+
+.. automodule:: postgres.cache
+    :members:
+    :member-order: bysource
+
+
 An Object-Relational Mapper (ORM)
 ---------------------------------
 
@@ -37,6 +45,8 @@ Changelog
 
 **4.0 (???)**
 
+- implemented caching query results (:pr:`97`)
+- **BREAKING**: the methods :meth:`~postgres.cursors.SimpleCursorBase.one` and :meth:`~postgres.cursors.SimpleCursorBase.all` now have a `max_age` argument; make sure your code doesn't use it as a parameter name
 - dropped support for Python 2.7 and 3.5 (:pr:`96`)
 
 **3.0.0 (Oct 19, 2019)**

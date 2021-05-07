@@ -1,10 +1,12 @@
 from collections import namedtuple
+from threading import Thread
 from unittest import TestCase
 
 from postgres import (
     AlreadyRegistered, NotAModel, NotRegistered, NoSuchType, NoTypeSpecified,
     Postgres,
 )
+from postgres.cache import Cache
 from postgres.cursors import (
     BadBackAs, TooFew, TooMany,
     Row, SimpleDictCursor, SimpleNamedTupleCursor, SimpleRowCursor, SimpleTupleCursor,
@@ -208,6 +210,95 @@ class TestOne(WithData):
             "%r is not a valid value for the back_as argument.\n"
             "The available values are: Row, dict, namedtuple, tuple."
         ) % 'foo'
+
+
+# db.cache
+# ========
+
+class TestCache(TestCase):
+
+    def setUp(self):
+        self.db = Postgres(cache=Cache(max_size=1), cursor_factory=SimpleTupleCursor)
+        self.db.run("DROP SCHEMA IF EXISTS public CASCADE")
+        self.db.run("CREATE SCHEMA public")
+        self.db.run("CREATE TABLE foo (key text, value int)")
+        self.db.run("INSERT INTO foo VALUES ('a', 1)")
+        self.db.run("INSERT INTO foo VALUES ('b', 2)")
+
+    def test_one_returns_cached_row(self):
+        query = "SELECT * FROM foo WHERE key = 'a'"
+        r1 = self.db.one(query, max_age=10)
+        r2 = self.db.one(query, max_age=10)
+        assert r2 is r1
+
+    def test_all_returns_cached_rows(self):
+        query = "SELECT * FROM foo ORDER BY key"
+        r1 = self.db.all(query, max_age=10)
+        r2 = self.db.all(query, max_age=10)
+        assert r2 == r1
+        assert r2 is not r1
+        assert r2[0] is r1[0]
+
+    def test_back_as_is_compatible_with_caching(self):
+        query = "SELECT * FROM foo WHERE key = 'a'"
+        r1 = self.db.one(query, back_as=dict, max_age=10)
+        r2 = self.db.one(query, back_as=namedtuple, max_age=10)
+        assert r1 == r2._asdict()
+        rows = self.db.all(query, back_as='Row', max_age=10)
+        assert rows == [r1]
+
+    def test_all_returns_row_cached_by_one(self):
+        query = "SELECT * FROM foo WHERE key = 'a'"
+        row = self.db.one(query, max_age=10)
+        rows = self.db.all(query, max_age=10)
+        assert rows == [row]
+        assert rows[0] is row
+
+    def test_one_raises_TooMany_when_the_cache_contains_multiple_rows(self):
+        query = "SELECT * FROM foo"
+        rows = self.db.all(query, max_age=10)
+        assert len(rows) == 2
+        with self.assertRaises(TooMany):
+            self.db.one(query, max_age=10)
+
+    def test_cache_max_size(self):
+        query1 = b"SELECT * FROM foo WHERE key = 'a'"
+        query2 = b"SELECT * FROM foo WHERE key = 'b'"
+        self.db.all(query1, max_age=10)
+        assert set(self.db.cache.entries.keys()) == {query1}
+        self.db.all(query2, max_age=10)
+        assert set(self.db.cache.entries.keys()) == {query2}
+
+    def test_cache_max_age(self):
+        query = b"SELECT * FROM foo WHERE key = 'a'"
+        r1 = self.db.one(query, max_age=0)
+        r2 = self.db.one(query, max_age=10)
+        assert r2 is not r1
+
+    def test_cache_prune(self):
+        self.db.cache.max_size = 2
+        query1 = b"SELECT * FROM foo WHERE key = 'a'"
+        query2 = b"SELECT * FROM foo WHERE key = 'b'"
+        self.db.one(query1, max_age=-1)
+        self.db.one(query2, max_age=10)
+        assert set(self.db.cache.entries.keys()) == {query1, query2}
+        self.db.cache.prune()
+        assert set(self.db.cache.entries.keys()) == {query2}
+
+    def test_cache_prevents_concurrent_queries(self):
+        with self.db.get_cursor() as cursor:
+            cursor.run("LOCK TABLE foo IN EXCLUSIVE MODE")
+            def insert():
+                self.db.one("INSERT INTO foo VALUES ('c', 3) RETURNING *", max_age=1)
+            t1 = Thread(target=insert)
+            t2 = Thread(target=insert)
+            t1.start()
+            t2.start()
+            cursor.run("COMMIT")  # this releases the table lock
+        t1.join()
+        t2.join()
+        n = self.db.one("SELECT count(*) FROM foo WHERE key = 'c'")
+        assert n == 1
 
 
 # db.get_cursor

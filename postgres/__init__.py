@@ -173,6 +173,7 @@ from psycopg2.extensions import register_type
 from psycopg2.extras import CompositeCaster
 from psycopg2_pool import ThreadSafeConnectionPool
 
+from postgres.cache import Cache
 from postgres.context_managers import (
     ConnectionContextManager, CursorContextManager, CursorSubcontextManager,
     ConnectionCursorContextManager,
@@ -255,6 +256,7 @@ class Postgres:
         various methods as a :obj:`back_as` argument.
     :param type pool_class: The type of pool to use. Defaults to
         :class:`~psycopg2_pool.ThreadSafeConnectionPool`.
+    :param Cache cache: An instance of :class:`postgres.cache.Cache`.
 
     This is the main object that :mod:`postgres` provides, and you should
     have one instance per process for each PostgreSQL database your process
@@ -304,9 +306,10 @@ class Postgres:
     def __init__(self, url='', minconn=1, maxconn=10, idle_timeout=600,
                  readonly=False, cursor_factory=SimpleNamedTupleCursor,
                  back_as_registry=default_back_as_registry,
-                 pool_class=ThreadSafeConnectionPool):
+                 pool_class=ThreadSafeConnectionPool, cache=None):
 
         self.readonly = readonly
+        self.cache = cache or Cache()
 
         # Set up connection pool.
         # =======================
