@@ -56,10 +56,13 @@ class Cache:
 
     :arg int max_size: The maximum number of entries allowed in the cache.
 
-    This cache is designed to be thread-safe in CPython and any other Python
-    implementation in which dictionaries (including the :meth:`~dict.setdefault`
-    method) are thread-safe. It uses a different lock for each entry so that
-    unrelated queries don't block each other.
+    .. warning::
+        This cache is only designed to be thread-safe in CPython >= 3.6 and similar
+        Python implementations in which the :class:`~collections.OrderedDict`
+        class is thread-safe.
+
+    A separate lock is used for each entry so that unrelated queries don't block
+    each other.
 
     After inserting a new entry, the oldest one is removed if the cache now has
     more than `max_size` entries.
