@@ -43,7 +43,7 @@ An Object-Relational Mapper (ORM)
 Changelog
 ---------
 
-**4.0 (???)**
+**4.0 (Sep 20, 2021)**
 
 - implemented caching query results (:pr:`97`)
 - **BREAKING**: the methods :meth:`~postgres.cursors.SimpleCursorBase.one` and :meth:`~postgres.cursors.SimpleCursorBase.all` now have a `max_age` argument; make sure your code doesn't use it as a parameter name
